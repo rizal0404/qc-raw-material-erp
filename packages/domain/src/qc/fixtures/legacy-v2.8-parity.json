@@ -1,0 +1,110 @@
+{
+  "source": "Code(2).gs / QC Raw Material V2.8",
+  "chemistryFormula": {
+    "input": {
+      "sio2": 10,
+      "al2o3": 3,
+      "fe2o3": 2,
+      "cao": 45,
+      "mgo": 1,
+      "k2o": 0.5,
+      "na2o": 0.2,
+      "so3": 0.1,
+      "h2o": 2
+    },
+    "expected": {
+      "lsf": 137.02801461632157,
+      "sm": 2,
+      "am": 1.5,
+      "naeq": 0.529,
+      "r2o3": 15
+    }
+  },
+  "weightedMix": {
+    "rows": [
+      {
+        "tonnage": 25,
+        "chemistry": {
+          "sio2": 10,
+          "al2o3": 3,
+          "fe2o3": 2,
+          "cao": 45,
+          "mgo": 1,
+          "k2o": 0.5,
+          "na2o": 0.2,
+          "so3": 0.1,
+          "h2o": 2
+        }
+      },
+      {
+        "tonnage": 75,
+        "chemistry": {
+          "sio2": 12,
+          "al2o3": 4,
+          "fe2o3": 2.5,
+          "cao": 48,
+          "mgo": 1.2,
+          "k2o": 0.6,
+          "na2o": 0.25,
+          "so3": 0.12,
+          "h2o": 1.5
+        }
+      }
+    ],
+    "expectedChemistry": {
+      "sio2": 11.5,
+      "al2o3": 3.75,
+      "fe2o3": 2.375,
+      "cao": 47.25,
+      "mgo": 1.15,
+      "k2o": 0.575,
+      "na2o": 0.2375,
+      "so3": 0.115,
+      "h2o": 1.625
+    },
+    "expectedQuality": {
+      "lsf": 123.79236941215001,
+      "sm": 1.8775510204081634,
+      "am": 1.5789473684210527,
+      "naeq": 0.61585,
+      "r2o3": 17.625
+    }
+  },
+  "tonPerRetase": [
+    {
+      "materialKind": "LS",
+      "vendor": "Anything",
+      "source": "Anything",
+      "expected": 25
+    },
+    {
+      "materialKind": "CL",
+      "vendor": "PT Topabiring Trans Logistic",
+      "source": "Pile",
+      "expected": 30
+    },
+    {
+      "materialKind": "CL",
+      "vendor": "Other",
+      "source": "FABA",
+      "expected": 15
+    },
+    {
+      "materialKind": "CL",
+      "vendor": "Other",
+      "source": "Unknown",
+      "expected": 25
+    }
+  ],
+  "qafBaseline": {
+    "lsR2O3Max": 3,
+    "lsPileMin": 1100,
+    "lsPileMax": 5000,
+    "lsFillerMin": 2000,
+    "lsFillerMax": 5000,
+    "clSmMin": 2.3,
+    "clSmMax": 2.8,
+    "clAmMin": 1.4,
+    "clAmMax": 2.0
+  }
+}

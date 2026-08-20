@@ -1,0 +1,32 @@
+{
+  "name": "@qc/db",
+  "version": "0.7.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema/index.ts"
+  },
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node --env-file-if-exists=../../.env --import=tsx src/migrate.ts",
+    "db:verify": "node --env-file-if-exists=../../.env --import=tsx src/verify-migrations.ts",
+    "db:check": "drizzle-kit check",
+    "db:studio": "drizzle-kit studio",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "lint": "echo lint-placeholder",
+    "test": "node --import=tsx --test src/migration-config.test.ts"
+  },
+  "dependencies": {
+    "@qc/contracts": "workspace:*",
+    "@qc/domain": "workspace:*",
+    "drizzle-orm": "^0.44.0",
+    "postgres": "^3.4.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.0",
+    "typescript": "^5.9.0",
+    "tsx": "^4.0.0"
+  }
+}

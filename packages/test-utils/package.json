@@ -1,0 +1,12 @@
+{
+  "name": "@qc/test-utils",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "echo placeholder",
+    "typecheck": "echo placeholder",
+    "lint": "echo placeholder",
+    "test": "echo placeholder"
+  }
+}

@@ -1,0 +1,33 @@
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { createFileRoute } from '@tanstack/react-router';
+import type { Chemistry, MaterialKind } from '@qc/contracts';
+import { Modal } from '../../components/modal';
+import { createSample, listSamples, masterLookups, type RawSampleView } from '../../features/qc/qc-api';
+import { businessDateToday } from '../../lib/business-date';
+
+export const Route=createFileRoute('/_authenticated/raw-samples')({component:RawSamplesPage});
+const emptyChem:Chemistry={sio2:null,al2o3:null,fe2o3:null,cao:null,mgo:null,k2o:null,na2o:null,so3:null,h2o:null};
+const today=businessDateToday;
+const fmt=(v:number|null,d=2)=>v===null?'—':v.toLocaleString('id-ID',{maximumFractionDigits:d});
+
+function RawSamplesPage(){
+  const qc=useQueryClient();const [kind,setKind]=useState<MaterialKind>('LS');const [date,setDate]=useState(today());const [search,setSearch]=useState('');const [open,setOpen]=useState(false);
+  const [form,setForm]=useState({sampleId:'',operationDate:today(),noSample:'',sourceShift:'',typeGrade:'',vendorId:'',sourceId:'',loaderUnitNo:'',block:'',direction:'',note:'',chemistry:{...emptyChem}});
+  const lookups=useQuery({queryKey:['lookups','master'],queryFn:masterLookups});
+  const samples=useQuery({queryKey:['samples',kind,date,search],queryFn:()=>listSamples({materialKind:kind,operationDate:date,search,limit:500,offset:0})});
+  const mutation=useMutation({mutationFn:()=>createSample({...form,materialKind:kind,vendorId:form.vendorId||null,sourceId:form.sourceId||null,noSample:form.noSample||null,sourceShift:form.sourceShift||null,typeGrade:form.typeGrade||null,loaderUnitNo:form.loaderUnitNo||null,block:form.block||null,direction:form.direction||null,note:form.note||null}),onSuccess:async()=>{setOpen(false);await qc.invalidateQueries({queryKey:['samples']});}});
+  const vendors=lookups.data?.vendors??[];const sources=(lookups.data?.sources??[]).filter(x=>x.materialKind===kind);
+  const rows=samples.data?.items??[];
+  const setChem=(key:keyof Chemistry,value:string)=>setForm(f=>({...f,chemistry:{...f.chemistry,[key]:value===''?null:Number(value)}}));
+  const oxideKeys=useMemo(()=>['sio2','al2o3','fe2o3','cao','mgo','k2o','na2o','so3','h2o'] as (keyof Chemistry)[],[]);
+  return <section className="page-stack">
+    <div className="page-heading"><div><p className="eyebrow">SLICE 03 / RAW SAMPLE</p><h1>Raw Sample Laboratory</h1><p>Single native database untuk Limestone dan Clay, dengan quality value dihitung dari shared formula engine.</p></div><button className="btn primary" onClick={()=>{setForm({sampleId:'',operationDate:date,noSample:'',sourceShift:'',typeGrade:'',vendorId:'',sourceId:'',loaderUnitNo:'',block:'',direction:'',note:'',chemistry:{...emptyChem}});setOpen(true)}}>+ Sample</button></div>
+    <div className="card toolbar-card"><select value={kind} onChange={e=>setKind(e.target.value as MaterialKind)}><option value="LS">Limestone</option><option value="CL">Clay</option></select><input type="date" value={date} onChange={e=>setDate(e.target.value)}/><input placeholder="Cari Sample ID / vendor / source..." value={search} onChange={e=>setSearch(e.target.value)}/><span className="toolbar-meta">{samples.data?.total??0} sample</span></div>
+    <div className="card table-card"><div className="table-shell"><table className="native-table qc-wide"><thead><tr><th>Sample ID</th><th>No Sample</th><th>Type/Grade</th><th>Vendor</th><th>Source</th><th>CaO</th><th>LSF</th><th>SM</th><th>AM</th><th>NaEq</th><th>Loader</th><th>Block</th></tr></thead><tbody>{rows.length?rows.map((r:RawSampleView)=><tr key={r.id}><td><strong>{r.sampleId}</strong><small className="table-sub">{r.operationDate}</small></td><td>{r.noSample??'—'}</td><td>{r.typeGrade??'—'}</td><td>{r.vendorSnapshot??'—'}</td><td>{r.sourceSnapshot??'—'}</td><td>{fmt(r.chemistry.cao)}</td><td>{fmt(r.quality.lsf)}</td><td>{fmt(r.quality.sm)}</td><td>{fmt(r.quality.am)}</td><td>{fmt(r.quality.naeq)}</td><td>{r.loaderUnitNo??'—'}</td><td>{r.block??'—'}</td></tr>):<tr><td colSpan={12} className="table-empty">Belum ada sample pada filter ini.</td></tr>}</tbody></table></div></div>
+    {open&&<Modal title="Tambah Raw Sample" subtitle="Field mengikuti 10_DB_LIMESTONE / 11_DB_CLAY legacy." onClose={()=>setOpen(false)} footer={<><button className="btn" onClick={()=>setOpen(false)}>Batal</button><button className="btn primary" disabled={mutation.isPending||!form.sampleId||!form.operationDate} onClick={()=>mutation.mutate()}>{mutation.isPending?'Menyimpan...':'Simpan Sample'}</button></>}>
+      <div className="form-grid"><label><span>Sample ID</span><input value={form.sampleId} onChange={e=>setForm(f=>({...f,sampleId:e.target.value}))}/></label><label><span>Tanggal</span><input type="date" value={form.operationDate} onChange={e=>setForm(f=>({...f,operationDate:e.target.value}))}/></label><label><span>No Sample</span><input value={form.noSample} onChange={e=>setForm(f=>({...f,noSample:e.target.value}))}/></label><label><span>Jam / Shift</span><input value={form.sourceShift} onChange={e=>setForm(f=>({...f,sourceShift:e.target.value}))}/></label><label><span>Grade / Type</span><input value={form.typeGrade} onChange={e=>setForm(f=>({...f,typeGrade:e.target.value}))}/></label><label><span>Vendor</span><select value={form.vendorId} onChange={e=>setForm(f=>({...f,vendorId:e.target.value}))}><option value="">— optional —</option>{vendors.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}</select></label><label><span>Source</span><select value={form.sourceId} onChange={e=>setForm(f=>({...f,sourceId:e.target.value}))}><option value="">— optional —</option>{sources.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}</select></label><label><span>No Alat Muat</span><input value={form.loaderUnitNo} onChange={e=>setForm(f=>({...f,loaderUnitNo:e.target.value}))}/></label><label><span>Blok</span><input value={form.block} onChange={e=>setForm(f=>({...f,block:e.target.value}))}/></label><label><span>Arah</span><input value={form.direction} onChange={e=>setForm(f=>({...f,direction:e.target.value}))}/></label><div className="span-2 oxide-mini-grid">{oxideKeys.map(k=><label key={k}><span>{k.toUpperCase()}</span><input type="number" step="0.0001" value={form.chemistry[k]??''} onChange={e=>setChem(k,e.target.value)}/></label>)}</div><label className="span-2"><span>Keterangan</span><input value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))}/></label></div>
+      {mutation.isError&&<div className="alert error modal-alert">{mutation.error.message}</div>}
+    </Modal>}
+  </section>
+}

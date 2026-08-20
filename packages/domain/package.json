@@ -1,0 +1,22 @@
+{
+  "name": "@qc/domain",
+  "version": "0.7.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "lint": "echo lint-placeholder",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@qc/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^3.0.0"
+  }
+}

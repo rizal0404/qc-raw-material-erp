@@ -1,0 +1,28 @@
+{
+  "name": "qc-raw-material-native",
+  "private": true,
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @qc/web --filter @qc/api dev",
+    "dev:supabase": "node --env-file-if-exists=.env scripts/run-supabase.mjs app:dev",
+    "dev:api:supabase": "node --env-file-if-exists=.env scripts/run-supabase.mjs api:dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter @qc/db db:generate",
+    "db:migrate": "pnpm --filter @qc/db db:migrate",
+    "db:migrate:supabase": "node --env-file-if-exists=.env scripts/run-supabase.mjs db:migrate",
+    "db:verify": "pnpm --filter @qc/db db:verify",
+    "db:verify:supabase": "node --env-file-if-exists=.env scripts/run-supabase.mjs db:verify",
+    "db:check": "pnpm --filter @qc/db db:check",
+    "db:studio": "pnpm --filter @qc/db db:studio",
+    "bootstrap:admin": "pnpm --filter @qc/api bootstrap:admin",
+    "bootstrap:admin:supabase": "node --env-file-if-exists=.env scripts/run-supabase.mjs bootstrap:admin",
+    "start:supabase": "node --env-file-if-exists=.env scripts/run-supabase.mjs api:start"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "@types/node": "^22.0.0"
+  }
+}
