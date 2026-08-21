@@ -11,12 +11,4 @@ console.info('[startup] API configuration loaded');
 const { buildApp } = await import('./application');
 const app = await buildApp(config);
 console.info('[startup] Fastify application ready');
-
-// Vercel's Fastify runtime serves the exported instance itself. Calling
-// listen() there starts a nested HTTP server and can leave the invocation
-// waiting indefinitely. Local and persistent deployments still own a port.
-if (!process.env.VERCEL) {
-  await app.listen({ host: config.host, port: config.port });
-}
-
-export default app;
+await app.listen({ host: config.host, port: config.port });
