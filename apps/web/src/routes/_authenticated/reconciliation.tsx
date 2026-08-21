@@ -28,6 +28,7 @@ export const Route = createFileRoute('/_authenticated/reconciliation')({ compone
 const today = businessDateToday;
 const fmtTime = (value: string) => new Date(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const statuses: MappingStatus[] = ['UNMAPPED', 'SUGGESTED', 'AMBIGUOUS', 'CONFIRMED', 'CONSUMED', 'REVIEW_REQUIRED'];
+const editableAllocationStatuses: MappingStatus[] = ['SUGGESTED', 'AMBIGUOUS', 'REVIEW_REQUIRED'];
 
 function badgeClass(status: MappingStatus) {
   if (status === 'CONFIRMED' || status === 'CONSUMED') return 'success';
@@ -89,7 +90,7 @@ function ReconciliationPage() {
 
   useEffect(() => {
     if (!selected) return;
-    const editable = selected.allocations.find((item) => ['SUGGESTED', 'AMBIGUOUS', 'REVIEW_REQUIRED'].includes(item.mappingStatus)) ?? null;
+    const editable = selected.allocations.find((item) => editableAllocationStatuses.includes(item.mappingStatus)) ?? null;
     setAllocation(editable);
     setSampleId(editable?.sampleId ?? selected.suggestedSampleId ?? '');
     setApproved(String(editable?.approvedRetase ?? (Math.max(0, selected.remainingRetase) || '')));
@@ -122,7 +123,8 @@ function ReconciliationPage() {
       if (!selected || !sampleId) throw new Error('Sample_ID wajib dipilih.');
       const value = Number(approved);
       if (!Number.isInteger(value) || value <= 0) throw new Error('Approved Retase harus bilangan bulat > 0.');
-      if (allocation) return updateRetaseAllocation(allocation.id, { sampleId, approvedRetase: value, note: note || null });
+      const current = allocation ?? selected.allocations.find((item) => editableAllocationStatuses.includes(item.mappingStatus));
+      if (current) return updateRetaseAllocation(current.id, { sampleId, approvedRetase: value, note: note || null });
       return createRetaseAllocation({ assignmentId: selected.assignmentId, sampleId, approvedRetase: value, note: note || null });
     },
     onSuccess: async (result) => {
@@ -135,7 +137,7 @@ function ReconciliationPage() {
 
   const confirmMapping = useMutation({
     mutationFn: async () => {
-      let current = allocation;
+      let current = allocation ?? selected?.allocations.find((item) => editableAllocationStatuses.includes(item.mappingStatus));
       if (!current) {
         const saved = await saveMapping.mutateAsync();
         current = saved.item;
@@ -182,7 +184,7 @@ function ReconciliationPage() {
   }, [lookups.data?.crushers, kind]);
 
   const canCreateNewAllocation = selected ? selected.remainingRetase > 0 : false;
-  const isEditableAllocation = Boolean(allocation);
+  const isEditableAllocation = Boolean(allocation ?? selected?.allocations.find((item) => editableAllocationStatuses.includes(item.mappingStatus)));
   const showMappingForm = Boolean(selected && (isEditableAllocation || canCreateNewAllocation) && selected.mappingStatus !== 'CONSUMED');
 
   return (
@@ -265,7 +267,7 @@ function ReconciliationPage() {
           title="Retase Mapping"
           subtitle={`${selected.vendorName} · AM ${selected.amUnitNo} · ${selected.crusherName}`}
           onClose={() => { setSelected(null); setAllocation(null); }}
-          footer={<><button className="btn" onClick={() => { setSelected(null); setAllocation(null); }}>Tutup</button>{showMappingForm && <><button className="btn" disabled={!sampleId || saveMapping.isPending} onClick={() => saveMapping.mutate()}>Save Mapping</button><button className="btn primary" disabled={!sampleId || Number(approved) <= 0 || confirmMapping.isPending} onClick={() => confirmMapping.mutate()}>Save & Confirm</button></>}</>}
+          footer={<><button className="btn" onClick={() => { setSelected(null); setAllocation(null); }}>Tutup</button>{selected.mappingStatus !== 'CONSUMED' && <><button className="btn" disabled={!showMappingForm || !sampleId || saveMapping.isPending} onClick={() => saveMapping.mutate()}>Save Mapping</button><button className="btn primary" disabled={!showMappingForm || !sampleId || Number(approved) <= 0 || confirmMapping.isPending} onClick={() => confirmMapping.mutate()}>Save & Confirm</button></>}</>}
         >
           <div className="reconciliation-modal-grid"><div className="card-lite"><span>Observed</span><strong>{selected.observedRetase}</strong></div><div className="card-lite"><span>Reserved</span><strong>{selected.reservedRetase}</strong></div><div className="card-lite"><span>Remaining</span><strong>{selected.remainingRetase}</strong></div><div className="card-lite"><span>Candidate</span><strong>{candidates.data?.items.length ?? selected.candidateCount}</strong></div></div>
 

@@ -1,5 +1,10 @@
-import { buildApp } from './app';
+import Fastify from 'fastify';
+import { buildApp } from './application';
 import { loadConfig } from './config';
+
+// Keep the Fastify import in the runtime entrypoint so Vercel's framework
+// detector selects this file instead of the application factory.
+void Fastify;
 
 const config = loadConfig();
 const app = await buildApp(config);

@@ -57,7 +57,11 @@ export async function buildApp(config: AppConfig) {
     sessionTouchIntervalMs: config.auth.sessionTouchIntervalMs,
   });
 
-  await app.register(cors, { origin: config.corsOrigins, credentials: true });
+  await app.register(cors, {
+    origin: config.corsOrigins,
+    credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  });
   await app.register(cookie);
   await app.register(swagger, {
     openapi: {

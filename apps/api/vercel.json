@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "fastify",
+  "functions": {
+    "src/**/*.ts": {
+      "includeFiles": "../../packages/**"
+    }
+  }
+}
