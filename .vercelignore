@@ -1,0 +1,11 @@
+# Local/VPS infrastructure — not needed for Vercel build
+infra/docker/
+scripts/
+.tmp/
+
+# Project documentation (not needed at runtime)
+docs/
+SLICE_*.md
+full_web_app_PRD.md
+implementation_plan_full_native_web.md
+changelog_by_vscode.md
