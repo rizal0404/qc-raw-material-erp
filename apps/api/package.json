@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --env-file=../../.env --import=tsx --watch src/server.ts",
-    "build": "esbuild src/server.ts --bundle --platform=node --target=node24 --format=esm --packages=external --alias:@qc/contracts=../../packages/contracts/src/index.ts --alias:@qc/domain=../../packages/domain/src/index.ts --alias:@qc/db=../../packages/db/src/index.ts --outfile=dist/server.js --sourcemap",
+    "build": "esbuild src/server.ts --bundle --platform=node --target=node24 --format=esm --external:fastify --external:@fastify/cookie --external:@fastify/cors --external:@fastify/swagger --external:@fastify/swagger-ui --external:zod --external:@node-rs/argon2 --alias:@qc/contracts=../../packages/contracts/src/index.ts --alias:@qc/domain=../../packages/domain/src/index.ts --alias:@qc/db=../../packages/db/src/index.ts --outfile=dist/server.js --sourcemap",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "lint": "echo lint-placeholder",
