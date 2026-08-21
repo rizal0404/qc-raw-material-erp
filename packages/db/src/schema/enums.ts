@@ -12,3 +12,6 @@ export const mappingStatusEnum = pgEnum('mapping_status', ['UNMAPPED','SUGGESTED
 export const mixStatusEnum = pgEnum('mix_status', ['ACTIVE','REPLACED','VOID']);
 
 export const tonPerRetaseRuleTypeEnum = pgEnum('ton_per_retase_rule_type', ['DEFAULT','MATCH_KEY']);
+export const stockpileLotStatusEnum = pgEnum('stockpile_lot_status', ['ACTIVE','RECLAIMED']);
+export const stockpileLotNoModeEnum = pgEnum('stockpile_lot_no_mode', ['PILE_CYCLE','MANUAL']);
+export const warehouseZoneKindEnum = pgEnum('warehouse_zone_kind', ['FILLER','HOPPER','LOADER_FEED','DIVIDER','TRACK','LABEL']);

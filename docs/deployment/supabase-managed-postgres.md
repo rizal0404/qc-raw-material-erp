@@ -56,7 +56,7 @@ pnpm dev:supabase
 
 These commands select `SUPABASE_DATABASE_URL` only for their child process. The ordinary `pnpm dev`, `pnpm db:migrate`, and `pnpm db:verify` commands continue to use local Docker PostgreSQL.
 
-`pnpm dev:supabase` starts the complete staging-connected app at `http://localhost:5174` with its API at `http://localhost:3137`. Use `pnpm dev:api:supabase` when only the API is needed.
+`pnpm dev:supabase` starts the complete staging-connected app at `http://localhost:5174` with its API at `http://localhost:3137`. The launcher derives the browser API URL and API CORS allowlist from `SUPABASE_API_PORT` and `SUPABASE_WEB_PORT`, so the ordinary local values in `VITE_API_BASE_URL` and `API_CORS_ORIGIN` do not need to be edited. The web port is strict: if it is already occupied, stop the old process or choose another `SUPABASE_WEB_PORT` instead of following a silently incremented Vite port. Use `pnpm dev:api:supabase` when only the API is needed.
 
 After migration verification:
 

@@ -11,3 +11,4 @@ export * from './vendor-operation';
 
 export * from './retase';
 export * from './reconciliation';
+export * from './stockpile-map';

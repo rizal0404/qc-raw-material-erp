@@ -4,7 +4,7 @@ import cookie from '@fastify/cookie';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { ZodError } from 'zod';
-import { createDatabase, createIamRepository, createMasterRepository, createQcRepository, createVendorOperationRepository, createRetaseRepository, createReconciliationRepository } from '@qc/db';
+import { createDatabase, createIamRepository, createMasterRepository, createQcRepository, createVendorOperationRepository, createRetaseRepository, createReconciliationRepository, createStockpileMapRepository } from '@qc/db';
 import type { AppConfig } from './config';
 import { AppError } from './lib/errors';
 import { registerSystemRoutes } from './modules/system/routes';
@@ -23,6 +23,8 @@ import { registerRetaseRoutes } from './modules/retase/routes';
 import { createRetaseService } from './modules/retase/service';
 import { registerReconciliationRoutes } from './modules/reconciliation/routes';
 import { createReconciliationService } from './modules/reconciliation/service';
+import { registerStockpileMapRoutes } from './modules/stockpile-map/routes';
+import { createStockpileMapService } from './modules/stockpile-map/service';
 
 function isAllowedOrigin(config: AppConfig, origin: string | undefined): boolean {
   if (!origin) return true;
@@ -43,6 +45,8 @@ export async function buildApp(config: AppConfig) {
   const retaseService = createRetaseService(retaseRepository, masterRepository, { undoWindowMs: config.counter.undoWindowMs });
   const reconciliationRepository = createReconciliationRepository(database.db);
   const reconciliationService = createReconciliationService(reconciliationRepository);
+  const stockpileMapRepository = createStockpileMapRepository(database.db);
+  const stockpileMapService = createStockpileMapService(stockpileMapRepository, masterRepository, qcRepository);
   const authService = createAuthService({
     repository: iamRepository,
     passwordHasher: createArgonPasswordHasher({ pepper: config.auth.passwordPepper }),
@@ -123,6 +127,7 @@ export async function buildApp(config: AppConfig) {
     await registerVendorOperationRoutes(v1, vendorOperationService);
     await registerRetaseRoutes(v1, retaseService);
     await registerReconciliationRoutes(v1, reconciliationService);
+    await registerStockpileMapRoutes(v1, stockpileMapService);
     // Next slices: operations-reporting/audit explorer.
   }, { prefix: '/api/v1' });
 

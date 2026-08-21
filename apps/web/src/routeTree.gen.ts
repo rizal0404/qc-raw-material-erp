@@ -13,6 +13,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedMasterDataRouteImport } from './routes/_authenticated/master-data'
+import { Route as AuthenticatedPetaMutuRouteImport } from './routes/_authenticated/peta-mutu'
 import { Route as AuthenticatedQcReportsRouteImport } from './routes/_authenticated/qc-reports'
 import { Route as AuthenticatedQcWorkbenchRouteImport } from './routes/_authenticated/qc-workbench'
 import { Route as AuthenticatedRawSamplesRouteImport } from './routes/_authenticated/raw-samples'
@@ -39,6 +40,11 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
 const AuthenticatedMasterDataRoute = AuthenticatedMasterDataRouteImport.update({
   id: '/master-data',
   path: '/master-data',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPetaMutuRoute = AuthenticatedPetaMutuRouteImport.update({
+  id: '/peta-mutu',
+  path: '/peta-mutu',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedQcReportsRoute = AuthenticatedQcReportsRouteImport.update({
@@ -91,6 +97,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/login': typeof LoginRoute
   '/master-data': typeof AuthenticatedMasterDataRoute
+  '/peta-mutu': typeof AuthenticatedPetaMutuRoute
   '/qc-reports': typeof AuthenticatedQcReportsRoute
   '/qc-workbench': typeof AuthenticatedQcWorkbenchRoute
   '/raw-samples': typeof AuthenticatedRawSamplesRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/master-data': typeof AuthenticatedMasterDataRoute
+  '/peta-mutu': typeof AuthenticatedPetaMutuRoute
   '/qc-reports': typeof AuthenticatedQcReportsRoute
   '/qc-workbench': typeof AuthenticatedQcWorkbenchRoute
   '/raw-samples': typeof AuthenticatedRawSamplesRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authenticated/master-data': typeof AuthenticatedMasterDataRoute
+  '/_authenticated/peta-mutu': typeof AuthenticatedPetaMutuRoute
   '/_authenticated/qc-reports': typeof AuthenticatedQcReportsRoute
   '/_authenticated/qc-workbench': typeof AuthenticatedQcWorkbenchRoute
   '/_authenticated/raw-samples': typeof AuthenticatedRawSamplesRoute
@@ -134,6 +143,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/master-data'
+    | '/peta-mutu'
     | '/qc-reports'
     | '/qc-workbench'
     | '/raw-samples'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/master-data'
+    | '/peta-mutu'
     | '/qc-reports'
     | '/qc-workbench'
     | '/raw-samples'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/login'
     | '/_authenticated/master-data'
+    | '/_authenticated/peta-mutu'
     | '/_authenticated/qc-reports'
     | '/_authenticated/qc-workbench'
     | '/_authenticated/raw-samples'
@@ -204,6 +216,13 @@ declare module '@tanstack/react-router' {
       path: '/master-data'
       fullPath: '/master-data'
       preLoaderRoute: typeof AuthenticatedMasterDataRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/peta-mutu': {
+      id: '/_authenticated/peta-mutu'
+      path: '/peta-mutu'
+      fullPath: '/peta-mutu'
+      preLoaderRoute: typeof AuthenticatedPetaMutuRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/qc-reports': {
@@ -267,6 +286,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedMasterDataRoute: typeof AuthenticatedMasterDataRoute
+  AuthenticatedPetaMutuRoute: typeof AuthenticatedPetaMutuRoute
   AuthenticatedQcReportsRoute: typeof AuthenticatedQcReportsRoute
   AuthenticatedQcWorkbenchRoute: typeof AuthenticatedQcWorkbenchRoute
   AuthenticatedRawSamplesRoute: typeof AuthenticatedRawSamplesRoute
@@ -280,6 +300,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedMasterDataRoute: AuthenticatedMasterDataRoute,
+  AuthenticatedPetaMutuRoute: AuthenticatedPetaMutuRoute,
   AuthenticatedQcReportsRoute: AuthenticatedQcReportsRoute,
   AuthenticatedQcWorkbenchRoute: AuthenticatedQcWorkbenchRoute,
   AuthenticatedRawSamplesRoute: AuthenticatedRawSamplesRoute,

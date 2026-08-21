@@ -11,3 +11,4 @@ export * from './repositories/vendor-operation.repository';
 export * from './repositories/retase.repository';
 
 export * from './repositories/reconciliation.repository';
+export * from './repositories/stockpile-map.repository';

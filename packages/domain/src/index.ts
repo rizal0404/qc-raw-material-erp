@@ -21,3 +21,6 @@ export * from './retase/types';
 export * from './retase/business-context';
 export * from './reconciliation/types';
 export * from './reconciliation/ports';
+export * from './stockpile-map/types';
+export * from './stockpile-map/ports';
+export * from './stockpile-map/validation';

@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { resolveSupabaseDevConfig } from './supabase-dev-config.mjs';
 
 const stagingProjectRef = 'tejxcxlpoksittppontc';
 const projectRef = process.env.SUPABASE_PROJECT_REF?.trim() || stagingProjectRef;
@@ -22,21 +23,21 @@ if (urlProjectRef !== projectRef) {
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 const taskName = process.argv[2];
-const apiPort = process.env.SUPABASE_API_PORT?.trim() || '3137';
-const webPort = process.env.SUPABASE_WEB_PORT?.trim() || '5174';
+const { apiPort, webPort, webOrigin, apiBaseUrl } = resolveSupabaseDevConfig();
 const apiDevTask = {
   cwd: resolve(repositoryRoot, 'apps/api'),
   args: ['--import=tsx', '--watch', 'src/server.ts'],
   env: {
     DATABASE_TARGET: 'supabase',
     API_PORT: apiPort,
+    API_CORS_ORIGIN: webOrigin,
   },
 };
 const webDevTask = {
   cwd: resolve(repositoryRoot, 'apps/web'),
-  args: [resolve(repositoryRoot, 'apps/web/node_modules/vite/bin/vite.js'), '--port', webPort],
+  args: [resolve(repositoryRoot, 'apps/web/node_modules/vite/bin/vite.js'), '--port', webPort, '--strictPort'],
   env: {
-    VITE_API_BASE_URL: `http://localhost:${apiPort}/api/v1`,
+    VITE_API_BASE_URL: apiBaseUrl,
   },
 };
 const tasks = {
