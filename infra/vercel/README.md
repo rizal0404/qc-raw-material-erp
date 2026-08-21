@@ -9,9 +9,9 @@ Create two Vercel projects from the same repository:
 
 For both projects, keep **Include source files outside of the Root Directory in the Build Step** enabled under Project Settings > Build and Deployment > Root Directory. The API imports the local pnpm workspace packages `@qc/contracts`, `@qc/domain`, and `@qc/db` from `../../packages`.
 
-`apps/api/vercel.json` also explicitly includes those runtime workspace sources in the Fastify function. This is required because Vercel's file tracer can otherwise preserve the pnpm link at `node_modules/@qc/db` without copying its `src/index.ts`, which causes `ERR_MODULE_NOT_FOUND` during a cold start.
+The API production build bundles the runtime workspace packages into `dist/server.js`. This avoids retaining pnpm links such as `node_modules/@qc/db` in the Vercel Function, because their targets live outside the API project root and can otherwise be absent during a cold start. Third-party and native npm dependencies remain external and are installed normally by Vercel.
 
-Do not configure an Output Directory or a custom Build Command for the API. Vercel detects `src/server.ts` as the Fastify entrypoint; the reusable application factory intentionally lives at the non-entrypoint name `src/application.ts`. The repository requires Vercel CLI 48.6.0 or newer for local `vercel dev` testing.
+Keep the dashboard Build Command and Output Directory overrides empty so the repository settings remain authoritative. `apps/api/vercel.json` selects `dist`, and the API package build emits `dist/server.js`. The reusable application factory intentionally lives at the non-entrypoint name `src/application.ts`. The repository requires Vercel CLI 48.6.0 or newer for local `vercel dev` testing.
 
 ## API environment variables
 

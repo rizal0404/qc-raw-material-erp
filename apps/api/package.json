@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --env-file=../../.env --import=tsx --watch src/server.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "esbuild src/server.ts --bundle --platform=node --target=node24 --format=esm --packages=external --alias:@qc/contracts=../../packages/contracts/src/index.ts --alias:@qc/domain=../../packages/domain/src/index.ts --alias:@qc/db=../../packages/db/src/index.ts --outfile=dist/server.js --sourcemap",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "lint": "echo lint-placeholder",
@@ -25,6 +25,7 @@
     "@node-rs/argon2": "^2.0.2"
   },
   "devDependencies": {
+    "esbuild": "^0.25.0",
     "tsx": "^4.0.0",
     "typescript": "^5.9.0",
     "vitest": "^3.0.0"
