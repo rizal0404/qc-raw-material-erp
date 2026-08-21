@@ -6,8 +6,11 @@ import { loadConfig } from './config';
 // detector selects this file instead of the application factory.
 void Fastify;
 
+console.info('[startup] Loading API configuration');
 const config = loadConfig();
+console.info('[startup] API configuration loaded');
 const app = await buildApp(config);
+console.info('[startup] Fastify application ready');
 
 // Vercel's Fastify runtime serves the exported instance itself. Calling
 // listen() there starts a nested HTTP server and can leave the invocation
