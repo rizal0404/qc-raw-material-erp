@@ -1,5 +1,4 @@
 import Fastify from 'fastify';
-import { buildApp } from './application';
 import { loadConfig } from './config';
 
 // Keep the Fastify import in the runtime entrypoint so Vercel's framework
@@ -9,6 +8,7 @@ void Fastify;
 console.info('[startup] Loading API configuration');
 const config = loadConfig();
 console.info('[startup] API configuration loaded');
+const { buildApp } = await import('./application');
 const app = await buildApp(config);
 console.info('[startup] Fastify application ready');
 
