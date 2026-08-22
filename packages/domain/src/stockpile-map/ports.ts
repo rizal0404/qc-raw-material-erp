@@ -18,19 +18,19 @@ export interface StockpileMapRepository {
   listLayouts():Promise<WarehouseLayoutRecord[]>;
   findLayout(id:string):Promise<WarehouseLayoutRecord|null>;
   listZones(layoutId:string):Promise<WarehouseZoneRecord[]>;
-  listLots(layoutId:string,status:StockpileLotStatusFilter):Promise<StockpileLotRecord[]>;
+  listLots(layoutId:string,status:StockpileLotStatusFilter,asOf?:Date):Promise<StockpileLotRecord[]>;
   findLot(id:string):Promise<StockpileLotRecord|null>;
-  listLayers(layoutId:string,status:StockpileLotStatusFilter):Promise<StockpileLayerRecord[]>;
+  listLayers(layoutId:string,status:StockpileLotStatusFilter,asOf?:Date):Promise<StockpileLayerRecord[]>;
   findLayer(id:string):Promise<StockpileLayerRecord|null>;
-  listLayerMixes(layerIds:string[]):Promise<StockpileMixSummaryRecord[]>;
+  listLayerMixes(layerIds:string[],asOf?:Date):Promise<StockpileMixSummaryRecord[]>;
   listAvailableMixes(layoutId:string,onlyUnplaced:boolean):Promise<StockpileMixSummaryRecord[]>;
   findMixes(ids:string[]):Promise<StockpileMixSummaryRecord[]>;
   createLayer(input:CreateStockpileLayerRepositoryInput):Promise<{lotId:string;layerId:string}>;
   updateLayer(input:UpdateStockpileLayerRepositoryInput):Promise<void>;
   updateLot(input:UpdateStockpileLotRepositoryInput):Promise<void>;
-  latestReclaimerPosition(layoutId:string):Promise<ReclaimerPositionRecord|null>;
+  latestReclaimerPosition(layoutId:string,asOf?:Date):Promise<ReclaimerPositionRecord|null>;
   appendReclaimerPosition(input:{layoutId:string;position:number;effectiveAt:Date;expectedEventId:string|null;reason:string|null;actorUserId:string}):Promise<ReclaimerPositionRecord>;
-  countLots(layoutId:string,status:StockpileLotStatus):Promise<number>;
-  countUnplacedMixes(layoutId:string):Promise<number>;
+  countLots(layoutId:string,status:StockpileLotStatus,asOf?:Date):Promise<number>;
+  countUnplacedMixes(layoutId:string,asOf?:Date):Promise<number>;
   appendAudit(input:AuditWriteInput):Promise<void>;
 }

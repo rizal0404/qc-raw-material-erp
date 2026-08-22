@@ -112,6 +112,7 @@ export const ReclaimerPositionSchema = z.object({
 export const StockpileMapQuerySchema = z.object({
   layoutId: z.string().uuid(),
   lotStatus: StockpileLotStatusFilterSchema.default('ACTIVE'),
+  asOf: z.string().date().optional(),
 });
 
 export const AvailableStockpileMixesQuerySchema = z.object({
@@ -166,6 +167,8 @@ export const SaveReclaimerPositionRequestSchema = z.object({
 
 export const StockpileMapResponseSchema = z.object({
   ok: z.literal(true),
+  asOf: z.string().date(),
+  isHistorical: z.boolean(),
   layout: WarehouseLayoutSchema,
   zones: z.array(WarehouseZoneSchema),
   lots: z.array(StockpileLotSchema),

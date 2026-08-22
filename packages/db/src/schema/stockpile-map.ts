@@ -96,6 +96,42 @@ export const stockpileLayerMixes = pgTable('stockpile_layer_mixes', {
   uniqueIndex('stockpile_layer_mixes_mix_uq').on(t.mixId),
 ]);
 
+export const stockpileLotVersions = pgTable('stockpile_lot_versions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  lotId: uuid('lot_id').notNull().references(() => stockpileLots.id, { onDelete: 'cascade' }),
+  layoutId: uuid('layout_id').notNull().references(() => warehouseLayouts.id, { onDelete: 'restrict' }),
+  logicalPileId: uuid('logical_pile_id').notNull().references(() => piles.id, { onDelete: 'restrict' }),
+  lotNo: text('lot_no').notNull(),
+  lotNoMode: stockpileLotNoModeEnum('lot_no_mode').notNull(),
+  pileCycle: integer('pile_cycle').notNull(),
+  status: stockpileLotStatusEnum('status').notNull(),
+  reclaimedAt: timestamp('reclaimed_at', { withTimezone: true }),
+  effectiveAt: timestamp('effective_at', { withTimezone: true }).notNull().defaultNow(),
+  changedBy: uuid('changed_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+}, (t) => [
+  index('stockpile_lot_versions_layout_effective_idx').on(t.layoutId, t.effectiveAt),
+  index('stockpile_lot_versions_lot_effective_idx').on(t.lotId, t.effectiveAt),
+]);
+
+export const stockpileLayerVersions = pgTable('stockpile_layer_versions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  layerId: uuid('layer_id').notNull().references(() => stockpileLayers.id, { onDelete: 'cascade' }),
+  lotId: uuid('lot_id').notNull().references(() => stockpileLots.id, { onDelete: 'cascade' }),
+  label: text('label'),
+  startPosition: numeric('start_position', { precision: 12, scale: 4 }).notNull(),
+  endPosition: numeric('end_position', { precision: 12, scale: 4 }).notNull(),
+  bottomLevel: numeric('bottom_level', { precision: 12, scale: 4 }).notNull(),
+  topLevel: numeric('top_level', { precision: 12, scale: 4 }).notNull(),
+  version: integer('version').notNull(),
+  mixIds: jsonb('mix_ids').$type<string[]>().notNull().default([]),
+  effectiveAt: timestamp('effective_at', { withTimezone: true }).notNull().defaultNow(),
+  changedBy: uuid('changed_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+}, (t) => [
+  index('stockpile_layer_versions_layer_effective_idx').on(t.layerId, t.effectiveAt),
+  index('stockpile_layer_versions_lot_effective_idx').on(t.lotId, t.effectiveAt),
+  check('stockpile_layer_versions_geometry_check', sql`${t.startPosition} >= 0 AND ${t.endPosition} > ${t.startPosition} AND ${t.bottomLevel} >= 0 AND ${t.topLevel} > ${t.bottomLevel} AND ${t.version} > 0`),
+]);
+
 export const reclaimerPositionEvents = pgTable('reclaimer_position_events', {
   id: uuid('id').primaryKey().defaultRandom(),
   layoutId: uuid('layout_id').notNull().references(() => warehouseLayouts.id, { onDelete: 'restrict' }),

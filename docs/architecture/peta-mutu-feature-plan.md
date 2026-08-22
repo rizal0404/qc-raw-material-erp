@@ -15,7 +15,7 @@ Versi web sebaiknya meningkatkan keterbacaan dan traceability melalui:
 
 Fitur ini diimplementasikan sebagai vertical slice tersendiri tanpa mencampurkan komponen peta ke tabel `QC Reports`; sumber mutu tetap menggunakan read model Mix Summary yang sama.
 
-### Status implementasi 21 Agustus 2026
+### Status implementasi 22 Agustus 2026
 
 MVP operasional sudah tersedia pada route `/peta-mutu`:
 
@@ -26,10 +26,12 @@ MVP operasional sudah tersedia pada route `/peta-mutu`:
 - posisi dan level menerima bilangan pecahan; tinggi kotak mengikuti level fisik;
 - posisi REC bebas, mendukung drag/keyboard 0,1 unit, explicit save, event ledger, dan optimistic concurrency;
 - tampilan dapat difilter menjadi lot aktif, sudah direclaim, atau semua lot;
+- datepicker dapat membuka snapshot akhir hari pada tanggal sebelumnya dalam zona waktu WITA;
+- snapshot historis bersifat read-only dan merekonstruksi lot, layer, relasi Mix, serta posisi REC terakhir sampai tanggal yang dipilih;
 - write dibatasi server-side untuk `QC_ANALYST` dan `SUPERVISOR_ADMIN`, dengan reason opsional;
 - collision placement, konsistensi Mix/lot/layout, serta concurrent update divalidasi di backend.
 
-Histori `as of`, playback, overview semua gudang, editor layout/zone, dan integrasi PLC/DCS tetap menjadi pengembangan lanjutan.
+Data lot/layer yang sudah ada saat migrasi histori menjadi baseline pada `updated_at` masing-masing; aplikasi tidak memfabrikasi kondisi untuk tanggal yang lebih lama dari baseline tersebut. Playback, compare waktu, overview semua gudang, editor layout/zone, dan integrasi PLC/DCS tetap menjadi pengembangan lanjutan.
 
 ## 2. Interpretasi referensi Excel
 
@@ -285,7 +287,7 @@ Exit criteria: dua user tidak dapat silent-overwrite REC/layer dan semua perubah
 
 ### Tahap 3 — Polish dan histori (2–3 hari)
 
-- snapshot `as of`, compare waktu, dan histori gerakan;
+- snapshot `as of` read-only sudah diimplementasikan; compare waktu, playback, dan histori gerakan terperinci masih lanjutan;
 - import data awal dari workbook/CSV tervalidasi;
 - responsive QA, keyboard accessibility, print/export PNG/PDF bila dibutuhkan;
 - performance profiling dan index tuning.

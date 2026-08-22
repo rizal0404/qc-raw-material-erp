@@ -22,6 +22,12 @@ function mapRepositoryError(error:unknown):never{
   throw error;
 }
 const iso=(date:Date)=>date.toISOString();
+function businessDate(date=new Date()){
+  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Makassar',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date);
+  const part=(type:string)=>parts.find(item=>item.type===type)?.value??'';
+  return`${part('year')}-${part('month')}-${part('day')}`;
+}
+const endOfBusinessDate=(value:string)=>new Date(`${value}T23:59:59.999+08:00`);
 
 export function createStockpileMapService(repository:StockpileMapRepository,masterRepository:MasterRepository,qcRepository:QcRepository){
   async function layoutOrThrow(id:string){const layout=await repository.findLayout(id);if(!layout||!layout.active)throw notFound('Layout gudang tidak ditemukan atau nonaktif.');return layout;}
@@ -36,14 +42,14 @@ export function createStockpileMapService(repository:StockpileMapRepository,mast
 
   return{
     async layouts(principal:AuthPrincipal){assertQc(principal);return(await repository.listLayouts()).map((layout)=>({...layout,createdAt:undefined,updatedAt:undefined}));},
-    async map(principal:AuthPrincipal,input:{layoutId:string;lotStatus:StockpileLotStatusFilter}){
-      assertQc(principal);const layout=await layoutOrThrow(input.layoutId);
-      const[zones,lots,layers,reclaimer,activeLots,reclaimedLots,unplacedMixes,rules]=await Promise.all([repository.listZones(layout.id),repository.listLots(layout.id,input.lotStatus),repository.listLayers(layout.id,input.lotStatus),repository.latestReclaimerPosition(layout.id),repository.countLots(layout.id,'ACTIVE'),repository.countLots(layout.id,'RECLAIMED'),repository.countUnplacedMixes(layout.id),qcRepository.getQafRules(layout.plantId)]);
-      const mixRows=await repository.listLayerMixes(layers.map((layer)=>layer.id));const mixesByLayer=new Map<string,StockpileMixSummaryRecord[]>();for(const mix of mixRows){if(!mix.layerId)continue;const bucket=mixesByLayer.get(mix.layerId)??[];bucket.push(mix);mixesByLayer.set(mix.layerId,bucket);}
+    async map(principal:AuthPrincipal,input:{layoutId:string;lotStatus:StockpileLotStatusFilter;asOf?:string|undefined}){
+      assertQc(principal);const today=businessDate();const selectedDate=input.asOf??today;if(selectedDate>today)throw new AppError(400,'STOCKPILE_HISTORY_FUTURE_DATE','Tanggal Peta Mutu tidak boleh melewati hari ini.');const isHistorical=selectedDate<today;const historyCutoff=isHistorical?endOfBusinessDate(selectedDate):undefined;const layout=await layoutOrThrow(input.layoutId);
+      const[zones,lots,layers,reclaimer,activeLots,reclaimedLots,unplacedMixes,rules]=await Promise.all([repository.listZones(layout.id),repository.listLots(layout.id,input.lotStatus,historyCutoff),repository.listLayers(layout.id,input.lotStatus,historyCutoff),repository.latestReclaimerPosition(layout.id,historyCutoff),repository.countLots(layout.id,'ACTIVE',historyCutoff),repository.countLots(layout.id,'RECLAIMED',historyCutoff),repository.countUnplacedMixes(layout.id,historyCutoff),qcRepository.getQafRules(layout.plantId)]);
+      const mixRows=await repository.listLayerMixes(layers.map((layer)=>layer.id),historyCutoff);const mixesByLayer=new Map<string,StockpileMixSummaryRecord[]>();for(const mix of mixRows){if(!mix.layerId)continue;const bucket=mixesByLayer.get(mix.layerId)??[];bucket.push(mix);mixesByLayer.set(mix.layerId,bucket);}
       const lotLayers=new Map<string,StockpileLayerRecord[]>();for(const layer of layers){const bucket=lotLayers.get(layer.lotId)??[];bucket.push(layer);lotLayers.set(layer.lotId,bucket);}
       const layerDtos=await Promise.all(layers.map((layer)=>{const lot=lots.find((item)=>item.id===layer.lotId);return layerDto(layer,mixesByLayer.get(layer.id)??[],lot?.className??null,rules);}));
       const lotDtos=lots.map((lot)=>{const lotMixMap=new Map<string,StockpileMixSummaryRecord>();for(const layer of lotLayers.get(lot.id)??[])for(const mix of mixesByLayer.get(layer.id)??[])lotMixMap.set(mix.mixId,mix);const lotMixes=[...lotMixMap.values()];const aggregate=aggregateStockpileMixes(lotMixes);return{...lot,totalTon:aggregate.totalTon,chemistry:aggregate.chemistry,quality:aggregate.quality,qualityStatus:stockpileQualityStatus(layout.materialKind,lot.className,aggregate,rules),mixCount:lotMixes.length,layerCount:lotLayers.get(lot.id)?.length??0,reclaimedAt:lot.reclaimedAt?iso(lot.reclaimedAt):null,updatedAt:iso(lot.updatedAt),createdAt:undefined};});
-      return{layout:{...layout,createdAt:undefined,updatedAt:undefined},zones,lots:lotDtos,layers:layerDtos,reclaimer:reclaimer?{eventId:reclaimer.id,position:reclaimer.position,effectiveAt:iso(reclaimer.effectiveAt),createdByName:reclaimer.createdByName}:null,counts:{activeLots,reclaimedLots,unplacedMixes}};
+      return{asOf:selectedDate,isHistorical,layout:{...layout,createdAt:undefined,updatedAt:undefined},zones,lots:lotDtos,layers:layerDtos,reclaimer:reclaimer?{eventId:reclaimer.id,position:reclaimer.position,effectiveAt:iso(reclaimer.effectiveAt),createdByName:reclaimer.createdByName}:null,counts:{activeLots,reclaimedLots,unplacedMixes}};
     },
     async availableMixes(principal:AuthPrincipal,layoutId:string,onlyUnplaced:boolean){assertQc(principal);await layoutOrThrow(layoutId);return repository.listAvailableMixes(layoutId,onlyUnplaced);},
     async createLayer(principal:AuthPrincipal,input:CreateStockpileLayerRequest,requestId?:string){
