@@ -11,4 +11,17 @@ console.info('[startup] API configuration loaded');
 const { buildApp } = await import('./application');
 const app = await buildApp(config);
 console.info('[startup] Fastify application ready');
-await app.listen({ host: config.host, port: config.port });
+
+// Vercel serverless: export the Fastify instance as the default handler.
+// Vercel intercepts this export and routes incoming requests through it.
+// Local/VPS: detect direct execution and start the persistent listener.
+const isVercel = !!process.env.VERCEL;
+
+if (!isVercel) {
+  await app.listen({ host: config.host, port: config.port });
+}
+
+export default async (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
+  await app.ready();
+  app.server.emit('request', req, res);
+};
