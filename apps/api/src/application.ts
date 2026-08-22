@@ -123,6 +123,14 @@ export async function buildApp(config: AppConfig) {
     });
   });
 
+  app.get('/', async () => ({
+    ok: true as const,
+    service: 'qc-api',
+    version: config.version,
+    documentation: '/docs',
+    health: '/api/v1/health',
+  }));
+
   await app.register(async (v1) => {
     await registerSystemRoutes(v1, config);
     await registerIamRoutes(v1, config, authService, masterService);
