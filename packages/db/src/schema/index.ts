@@ -3,6 +3,8 @@ export * from './iam';
 export * from './master';
 export * from './raw-sample';
 export * from './vendor-operation';
+export * from './clay-report';
+export * from './clay-mixing';
 export * from './retase';
 export * from './mixing';
 export * from './audit';

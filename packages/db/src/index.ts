@@ -4,6 +4,7 @@ export * as schema from './schema/index';
 export * from './repositories/iam.repository';
 
 export * from './repositories/master.repository';
+export * from './repositories/clay-report.repository';
 export * from './repositories/qc.repository';
 
 export * from './repositories/vendor-operation.repository';

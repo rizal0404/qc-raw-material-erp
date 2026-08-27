@@ -1,9 +1,11 @@
-import { boolean, date, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { boolean, check, date, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { mappingStatusEnum, materialKindEnum, retaseEventStatusEnum, retaseEventTypeEnum } from './enums';
 import { users, vendors } from './iam';
 import { crushers, equipment, piles, sources } from './master';
 import { loadingAssignmentAas, loadingAssignments, vendorShiftReports } from './vendor-operation';
 import { rawSamples } from './raw-sample';
+import { clayReportColumns, clayShiftReports } from './clay-report';
 
 export const retaseEvents = pgTable('retase_events', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -18,6 +20,10 @@ export const retaseEvents = pgTable('retase_events', {
   assignmentId: uuid('assignment_id').references(() => loadingAssignments.id, { onDelete: 'restrict' }),
   assignmentAaId: uuid('assignment_aa_id').references(() => loadingAssignmentAas.id, { onDelete: 'restrict' }),
   assignmentOrigin: text('assignment_origin'),
+  clayReportId: uuid('clay_report_id').references(() => clayShiftReports.id, { onDelete: 'restrict' }),
+  clayReportColumnId: uuid('clay_report_column_id').references(() => clayReportColumns.id, { onDelete: 'restrict' }),
+  entrySource: text('entry_source').notNull().default('LIVE_COUNTER'),
+  entryBatchId: uuid('entry_batch_id'),
   amId: uuid('am_id').references(() => equipment.id, { onDelete: 'restrict' }),
   aaId: uuid('aa_id').references(() => equipment.id, { onDelete: 'restrict' }),
   sourceId: uuid('source_id').references(() => sources.id, { onDelete: 'restrict' }),
@@ -26,6 +32,7 @@ export const retaseEvents = pgTable('retase_events', {
   materialKind: materialKindEnum('material_kind'),
   materialCategory: text('material_category'),
   vendorNameSnapshot: text('vendor_name_snapshot'),
+  sourceNameSnapshot: text('source_name_snapshot'),
   amUnitNoSnapshot: text('am_unit_no_snapshot'),
   aaUnitNoSnapshot: text('aa_unit_no_snapshot'),
   delta: integer('delta').notNull(),
@@ -46,6 +53,24 @@ export const retaseEvents = pgTable('retase_events', {
   index('retase_aa_idx').on(t.aaId, t.eventTs),
   index('retase_actor_recent_idx').on(t.createdBy, t.operationDate, t.shiftCode, t.crusherId, t.eventTs),
   index('retase_report_idx').on(t.reportId, t.eventTs),
+  index('retase_clay_report_idx').on(t.clayReportId, t.clayReportColumnId, t.eventTs),
+  index('retase_clay_column_balance_idx').on(t.clayReportColumnId).where(sql`${t.clayReportColumnId} IS NOT NULL`),
+  index('retase_entry_batch_idx').on(t.entryBatchId),
+  check('retase_aa_snapshot_ck', sql`
+    ${t.eventType} = 'REVERSAL' OR ${t.aaId} IS NOT NULL
+    OR length(trim(coalesce(${t.aaUnitNoSnapshot}, ''))) > 0
+    OR (${t.materialKind} IS NOT NULL AND ${t.materialKind} = 'CL'
+        AND ${t.clayReportId} IS NOT NULL AND ${t.clayReportColumnId} IS NOT NULL)
+  `),
+  check('retase_reversal_shape_ck', sql`
+    (${t.eventType} = 'REVERSAL' AND ${t.delta} = -1 AND ${t.reversesEventId} IS NOT NULL AND ${t.reason} IS NOT NULL)
+    OR (${t.eventType} <> 'REVERSAL' AND ${t.delta} = 1)
+    OR (${t.eventType} = 'MANUAL_CORRECTION' AND ${t.delta} = -1
+        AND ${t.entrySource} = 'QC_BACKFILL' AND ${t.entryBatchId} IS NOT NULL
+        AND ${t.materialKind} IS NOT NULL AND ${t.materialKind} = 'CL'
+        AND ${t.clayReportId} IS NOT NULL AND ${t.clayReportColumnId} IS NOT NULL
+        AND ${t.reversesEventId} IS NULL AND length(trim(coalesce(${t.reason}, ''))) > 0)
+  `),
 ]);
 
 export const qcRetaseAllocations = pgTable('qc_retase_allocations', {

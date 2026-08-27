@@ -1,4 +1,4 @@
-import type { Chemistry, MaterialKind, MasterLookupResponse, Quality, SaveMixRequest } from '@qc/contracts';
+import type { Chemistry, MaterialKind, MasterLookupResponse, Quality, SaveMixRequest, ClayWorkbenchSource, ClayRetaseUse } from '@qc/contracts';
 import { apiFetch } from '../../lib/api-client';
 
 export interface RawSampleView {
@@ -7,13 +7,15 @@ export interface RawSampleView {
   chemistry:Chemistry;quality:Quality;note:string|null;createdAt:string;updatedAt:string;
 }
 export interface WorkbenchSample extends RawSampleView { defaultTonPerRetase:number;mappedRetase:number|null;retaseSource:string; }
-export interface MixItemView {id:string;rawSampleId:string;sampleId:string;noSample:string|null;typeGrade:string|null;vendorSnapshot:string|null;sourceSnapshot:string|null;retase:number;tonPerRetase:number;tonnage:number;chemistry:Chemistry;quality:Quality;note:string|null;hasChemistryRevision:boolean;retaseAllocationIds:string[];mappedRetaseConsumed:number;}
+export interface MixItemView {id:string;rawSampleId:string;sampleId:string;noSample:string|null;typeGrade:string|null;vendorSnapshot:string|null;sourceSnapshot:string|null;retase:number;tonPerRetase:number;tonnage:number;chemistry:Chemistry;quality:Quality;note:string|null;hasChemistryRevision:boolean;retaseAllocationIds:string[];mappedRetaseConsumed:number;clayRetaseSources:ClayRetaseUse[];}
 export interface MixView {id:string;mixCode:string;materialKind:MaterialKind;operationDate:string;pileId:string;pileCode:string;pileName:string;plantId:string|null;plantCode:string|null;plantName:string|null;className:string|null;shiftCode:string;batchNo:number|null;tiangKe:string|null;pileCycle:number;defaultTonPerRetase:number;status:string;replacesMixId:string|null;note:string|null;createdAt:string;updatedAt:string;items:MixItemView[];}
 export interface MixListItem extends Omit<MixView,'items'> {}
 
 export function masterLookups(){return apiFetch<MasterLookupResponse>('/lookups/master');}
+export function masterLookupsFor(materialKind:MaterialKind){return apiFetch<MasterLookupResponse>(`/lookups/master?materialKind=${materialKind}`);}
 export function listSamples(params:Record<string,string|number|undefined>){const q=new URLSearchParams();Object.entries(params).forEach(([k,v])=>{if(v!==undefined&&v!=='')q.set(k,String(v));});return apiFetch<{ok:true;items:RawSampleView[];total:number}>(`/samples?${q}`);}
 export function getWorkbenchSamples(materialKind:MaterialKind,operationDate:string){return apiFetch<{ok:true;items:WorkbenchSample[]}>(`/workbench/samples?materialKind=${materialKind}&operationDate=${operationDate}`);}
+export function getClayWorkbenchSources(operationDate:string,shiftCode:string){return apiFetch<{ok:true;items:ClayWorkbenchSource[]}>(`/workbench/clay-retase?operationDate=${operationDate}&shiftCode=${shiftCode}`);}
 export function listMixes(params:Record<string,string|number|undefined>){const q=new URLSearchParams();Object.entries(params).forEach(([k,v])=>{if(v!==undefined&&v!=='')q.set(k,String(v));});return apiFetch<{ok:true;items:MixListItem[];total:number}>(`/mixes?${q}`);}
 export function getMix(mixCode:string){return apiFetch<{ok:true;item:MixView}>(`/mixes/${encodeURIComponent(mixCode)}`);}
 export function saveMix(body:SaveMixRequest){return apiFetch<{ok:true;item:MixView}>('/mixes',{method:'POST',body:JSON.stringify(body)});}

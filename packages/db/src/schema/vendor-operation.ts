@@ -7,6 +7,7 @@ export const vendorShiftReports = pgTable('vendor_shift_reports', {
   id: uuid('id').primaryKey().defaultRandom(),
   operationDate: date('operation_date').notNull(),
   shiftCode: text('shift_code').notNull().references(() => shifts.code, { onDelete: 'restrict' }),
+  materialKind: materialKindEnum('material_kind').notNull().default('LS'),
   vendorId: uuid('vendor_id').notNull().references(() => vendors.id, { onDelete: 'restrict' }),
   version: integer('version').notNull().default(1),
   status: reportStatusEnum('status').notNull().default('DRAFT'),
@@ -34,8 +35,9 @@ export const vendorShiftReports = pgTable('vendor_shift_reports', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
-  uniqueIndex('vendor_shift_report_version_uq').on(t.operationDate, t.shiftCode, t.vendorId, t.version),
-  index('vendor_shift_current_idx').on(t.operationDate, t.shiftCode, t.vendorId, t.status),
+  uniqueIndex('vendor_shift_reports_id_kind_uq').on(t.id,t.materialKind),
+  uniqueIndex('vendor_shift_report_version_uq').on(t.operationDate, t.shiftCode, t.materialKind, t.vendorId, t.version),
+  index('vendor_shift_current_idx').on(t.operationDate, t.shiftCode, t.materialKind, t.vendorId, t.status),
 ]);
 
 export const loadingAssignments = pgTable('loading_assignments', {
@@ -61,6 +63,7 @@ export const loadingAssignments = pgTable('loading_assignments', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
+  uniqueIndex('loading_assignments_id_kind_uq').on(t.id,t.materialKind),
   index('loading_assignment_report_idx').on(t.reportId),
   index('loading_assignment_counter_idx').on(t.operationDate, t.shiftCode, t.crusherId, t.status),
   index('loading_assignment_operational_idx').on(t.assignmentOrigin, t.operationDate, t.shiftCode, t.vendorId, t.status),
@@ -70,6 +73,7 @@ export const loadingAssignmentAas = pgTable('loading_assignment_aas', {
   id: uuid('id').primaryKey().defaultRandom(),
   assignmentId: uuid('assignment_id').notNull().references(() => loadingAssignments.id, { onDelete: 'cascade' }),
   aaId: uuid('aa_id').notNull().references(() => equipment.id, { onDelete: 'restrict' }),
+  materialKind: materialKindEnum('material_kind').notNull(),
   validFrom: time('valid_from'),
   validTo: time('valid_to'),
   active: boolean('active').notNull().default(true),

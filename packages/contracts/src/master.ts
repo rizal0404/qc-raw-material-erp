@@ -11,10 +11,13 @@ export const MasterListQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-export const VendorListQuerySchema = MasterListQuerySchema;
+export const VendorListQuerySchema = MasterListQuerySchema.extend({
+  materialKind: MaterialKindSchema.optional(),
+});
 export const EquipmentListQuerySchema = MasterListQuerySchema.extend({
   vendorId: z.string().uuid().optional(),
   type: EquipmentTypeSchema.optional(),
+  materialKind: MaterialKindSchema.optional(),
 });
 export const CrusherListQuerySchema = MasterListQuerySchema.extend({
   materialKind: MaterialKindSchema.optional(),
@@ -28,18 +31,23 @@ export const PileListQuerySchema = MasterListQuerySchema.extend({
   materialKind: MaterialKindSchema.optional(),
   plantId: z.string().uuid().optional(),
 });
-export const PlantListQuerySchema = MasterListQuerySchema;
+export const PlantListQuerySchema = MasterListQuerySchema.extend({
+  materialKind: MaterialKindSchema.optional(),
+});
 
 const AuditReasonSchema = z.string().trim().min(3).max(500).optional();
 const CodeSchema = z.string().trim().min(1).max(64).regex(/^[A-Za-z0-9._ -]+$/);
 const NameSchema = z.string().trim().min(2).max(160);
 const AliasArraySchema = z.array(z.string().trim().min(1).max(120)).max(50).default([]);
+const MaterialKindsSchema = z.array(MaterialKindSchema).min(1).max(2)
+  .transform((values) => [...new Set(values)]);
 
 export const VendorSchema = z.object({
   id: z.string().uuid(),
   code: z.string(),
   name: z.string(),
   aliases: z.array(z.string()),
+  materialKinds: z.array(MaterialKindSchema),
   contactEmail: z.string().email().nullable(),
   active: z.boolean(),
   createdAt: z.string().datetime(),
@@ -49,12 +57,14 @@ export const CreateVendorRequestSchema = z.object({
   code: CodeSchema,
   name: NameSchema,
   aliases: AliasArraySchema,
+  materialKinds: MaterialKindsSchema.default(['LS', 'CL']),
   contactEmail: z.string().trim().email().nullable().optional(),
 });
 export const UpdateVendorRequestSchema = z.object({
   code: CodeSchema.optional(),
   name: NameSchema.optional(),
   aliases: AliasArraySchema.optional(),
+  materialKinds: MaterialKindsSchema.optional(),
   contactEmail: z.string().trim().email().nullable().optional(),
   active: z.boolean().optional(),
   reason: AuditReasonSchema,
@@ -64,13 +74,17 @@ export const PlantSchema = z.object({
   id: z.string().uuid(),
   code: z.string(),
   name: z.string(),
+  materialKinds: z.array(MaterialKindSchema),
   active: z.boolean(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
-export const CreatePlantRequestSchema = z.object({ code: CodeSchema, name: NameSchema });
+export const CreatePlantRequestSchema = z.object({
+  code: CodeSchema, name: NameSchema, materialKinds: MaterialKindsSchema.default(['LS', 'CL']),
+});
 export const UpdatePlantRequestSchema = z.object({
-  code: CodeSchema.optional(), name: NameSchema.optional(), active: z.boolean().optional(), reason: AuditReasonSchema,
+  code: CodeSchema.optional(), name: NameSchema.optional(), materialKinds: MaterialKindsSchema.optional(),
+  active: z.boolean().optional(), reason: AuditReasonSchema,
 }).refine((value) => Object.keys(value).some((key) => key !== 'reason'), { message: 'Tidak ada field yang diubah.' });
 
 export const CrusherSchema = z.object({
@@ -89,16 +103,18 @@ export const UpdateCrusherRequestSchema = z.object({
 export const EquipmentSchema = z.object({
   id: z.string().uuid(), vendorId: z.string().uuid(), vendorCode: z.string(), vendorName: z.string(),
   type: EquipmentTypeSchema, unitNo: z.string(), brand: z.string().nullable(), model: z.string().nullable(),
-  aliases: z.array(z.string()), active: z.boolean(), createdAt: z.string().datetime(), updatedAt: z.string().datetime(),
+  aliases: z.array(z.string()), materialKinds: z.array(MaterialKindSchema),
+  active: z.boolean(), createdAt: z.string().datetime(), updatedAt: z.string().datetime(),
 });
 export const CreateEquipmentRequestSchema = z.object({
   vendorId: z.string().uuid(), type: EquipmentTypeSchema, unitNo: z.string().trim().min(1).max(64),
-  brand: z.string().trim().max(120).nullable().optional(), model: z.string().trim().max(120).nullable().optional(), aliases: AliasArraySchema,
+  brand: z.string().trim().max(120).nullable().optional(), model: z.string().trim().max(120).nullable().optional(),
+  aliases: AliasArraySchema, materialKinds: MaterialKindsSchema.default(['LS', 'CL']),
 });
 export const UpdateEquipmentRequestSchema = z.object({
   vendorId: z.string().uuid().optional(), type: EquipmentTypeSchema.optional(), unitNo: z.string().trim().min(1).max(64).optional(),
   brand: z.string().trim().max(120).nullable().optional(), model: z.string().trim().max(120).nullable().optional(), aliases: AliasArraySchema.optional(),
-  active: z.boolean().optional(), reason: AuditReasonSchema,
+  materialKinds: MaterialKindsSchema.optional(), active: z.boolean().optional(), reason: AuditReasonSchema,
 }).refine((value) => Object.keys(value).some((key) => key !== 'reason'), { message: 'Tidak ada field yang diubah.' });
 
 export const SourceSchema = z.object({
@@ -141,7 +157,8 @@ export const MasterListResponseSchema = <T extends z.ZodTypeAny>(itemSchema: T) 
 export const MasterMutationResponseSchema = <T extends z.ZodTypeAny>(itemSchema: T) => z.object({ ok: z.literal(true), item: itemSchema });
 
 export const LookupOptionSchema = z.object({ id: z.string(), code: z.string(), label: z.string(), active: z.boolean() });
-export const EquipmentLookupOptionSchema = LookupOptionSchema.extend({ vendorId: z.string().uuid(), type: EquipmentTypeSchema, unitNo: z.string() });
+export const ScopedLookupOptionSchema = LookupOptionSchema.extend({ materialKinds: z.array(MaterialKindSchema) });
+export const EquipmentLookupOptionSchema = ScopedLookupOptionSchema.extend({ vendorId: z.string().uuid(), type: EquipmentTypeSchema, unitNo: z.string() });
 export const CrusherLookupOptionSchema = LookupOptionSchema.extend({ materialKind: MaterialKindSchema, plantId: z.string().uuid().nullable() });
 export const SourceLookupOptionSchema = LookupOptionSchema.extend({ materialKind: MaterialKindSchema, materialCategory: z.string(), block: z.string().nullable() });
 export const PileLookupOptionSchema = LookupOptionSchema.extend({ materialKind: MaterialKindSchema, plantId: z.string().uuid().nullable(), className: z.string().nullable() });
@@ -149,8 +166,8 @@ export const ShiftLookupOptionSchema = z.object({ code: z.string(), label: z.str
 
 export const MasterLookupResponseSchema = z.object({
   ok: z.literal(true),
-  vendors: z.array(LookupOptionSchema),
-  plants: z.array(LookupOptionSchema),
+  vendors: z.array(ScopedLookupOptionSchema),
+  plants: z.array(ScopedLookupOptionSchema),
   crushers: z.array(CrusherLookupOptionSchema),
   sources: z.array(SourceLookupOptionSchema),
   piles: z.array(PileLookupOptionSchema),

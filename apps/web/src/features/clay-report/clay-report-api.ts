@@ -1,0 +1,14 @@
+import type { ClayHourlyBackfillRequest, ClayReport, ClayReportContext, CreateClayColumnRequest, CreateClayOperationLogRequest, PatchClayReportRequest, UpdateClayColumnRequest } from '@qc/contracts';
+import { apiFetch } from '../../lib/api-client';
+const qs=({operationDate,shiftCode,crusherId}:ClayReportContext)=>new URLSearchParams({operationDate,shiftCode,crusherId}).toString();
+type Response={ok:true;report:ClayReport};
+export const getCurrentClayReport=(context:ClayReportContext)=>apiFetch<Response>(`/clay-reports/current?${qs(context)}`);
+export const ensureClayReport=(context:ClayReportContext)=>apiFetch<Response>('/clay-reports/ensure',{method:'POST',body:JSON.stringify(context)});
+export const patchClayReport=(id:string,body:PatchClayReportRequest)=>apiFetch<Response>(`/clay-reports/${id}`,{method:'PATCH',body:JSON.stringify(body)});
+export const createClayColumn=(id:string,body:CreateClayColumnRequest)=>apiFetch<Response>(`/clay-reports/${id}/columns`,{method:'POST',body:JSON.stringify(body)});
+export const updateClayColumn=(reportId:string,columnId:string,body:UpdateClayColumnRequest)=>apiFetch<Response>(`/clay-reports/${reportId}/columns/${columnId}`,{method:'PATCH',body:JSON.stringify(body)});
+export const addClayLog=(id:string,body:CreateClayOperationLogRequest)=>apiFetch<Response>(`/clay-reports/${id}/operation-logs`,{method:'POST',body:JSON.stringify(body)});
+export const backfillClay=(id:string,body:ClayHourlyBackfillRequest)=>apiFetch<Response>(`/clay-reports/${id}/hourly-backfill`,{method:'POST',body:JSON.stringify(body)});
+export const submitClay=(id:string)=>apiFetch<Response>(`/clay-reports/${id}/submit`,{method:'POST',body:'{}'});
+export const approveClay=(id:string)=>apiFetch<Response>(`/clay-reports/${id}/approve`,{method:'POST',body:'{}'});
+export const reopenClay=(id:string,reason:string)=>apiFetch<Response>(`/clay-reports/${id}/reopen`,{method:'POST',body:JSON.stringify({reason})});

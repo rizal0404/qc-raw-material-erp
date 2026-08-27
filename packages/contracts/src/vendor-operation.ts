@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { IsoDateSchema } from './dates';
+import { MaterialKindSchema } from './master';
 
 export const ShiftCodeSchema = z.enum(['SHIFT_1','SHIFT_2','SHIFT_3']);
 export const ShiftReportStatusSchema = z.enum(['DRAFT','SUBMITTED','SUPERSEDED','LOCKED','REVISED']);
@@ -41,6 +42,7 @@ export const ShiftReportDraftInputSchema = z.object({
   vendorId: z.string().uuid().optional(),
   operationDate: IsoDateSchema,
   shiftCode: ShiftCodeSchema,
+  materialKind: MaterialKindSchema.default('LS'),
   am: FleetSummarySchema,
   aa: FleetSummarySchema,
   note: NullableText,
@@ -51,6 +53,7 @@ export const ShiftReportCurrentQuerySchema = z.object({
   operationDate: IsoDateSchema,
   shiftCode: ShiftCodeSchema,
   vendorId: z.string().uuid().optional(),
+  materialKind: MaterialKindSchema.default('LS'),
 });
 
 export const ShiftReportListQuerySchema = z.object({
@@ -58,12 +61,13 @@ export const ShiftReportListQuerySchema = z.object({
   operationDate: IsoDateSchema.optional(),
   shiftCode: ShiftCodeSchema.optional(),
   status: ShiftReportStatusSchema.optional(),
+  materialKind: MaterialKindSchema.optional(),
   limit: z.coerce.number().int().min(1).max(250).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });
 
 export const CreateShiftReportRequestSchema = ShiftReportDraftInputSchema;
-export const UpdateShiftReportDraftRequestSchema = ShiftReportDraftInputSchema.omit({ vendorId: true, operationDate: true, shiftCode: true });
+export const UpdateShiftReportDraftRequestSchema = ShiftReportDraftInputSchema.omit({ vendorId: true, operationDate: true, shiftCode: true, materialKind: true });
 export const SubmitShiftReportRequestSchema = z.object({ reason: z.string().trim().max(500).nullable().optional() }).default({});
 export const CreateShiftReportRevisionRequestSchema = z.object({ reason: z.string().trim().min(3).max(500) });
 
@@ -109,6 +113,7 @@ export const ShiftReportSchema = z.object({
   vendorId: z.string().uuid(),
   vendorCode: z.string(),
   vendorName: z.string(),
+  materialKind: MaterialKindSchema,
   version: z.number().int().min(1),
   status: ShiftReportStatusSchema,
   am: FleetSummarySchema,

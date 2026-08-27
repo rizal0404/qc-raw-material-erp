@@ -1,6 +1,14 @@
-import { boolean, date, index, integer, numeric, pgTable, text, time, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { boolean, date, index, integer, numeric, pgTable, primaryKey, text, time, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { equipmentTypeEnum, materialKindEnum, tonPerRetaseRuleTypeEnum } from './enums';
 import { users, vendors } from './iam';
+
+export const vendorMaterialScopes = pgTable('vendor_material_scopes', {
+  vendorId: uuid('vendor_id').notNull().references(() => vendors.id, { onDelete: 'cascade' }),
+  materialKind: materialKindEnum('material_kind').notNull(),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.vendorId, t.materialKind], name: 'vendor_material_scopes_pk' }), index('vendor_material_scope_kind_idx').on(t.materialKind, t.active)]);
 
 
 export const vendorAliases = pgTable('vendor_aliases', {
@@ -18,6 +26,14 @@ export const plants = pgTable('plants', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex('plants_code_uq').on(t.code), index('plants_active_idx').on(t.active)]);
+
+export const plantMaterialScopes = pgTable('plant_material_scopes', {
+  plantId: uuid('plant_id').notNull().references(() => plants.id, { onDelete: 'cascade' }),
+  materialKind: materialKindEnum('material_kind').notNull(),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.plantId, t.materialKind], name: 'plant_material_scopes_pk' }), index('plant_material_scope_kind_idx').on(t.materialKind, t.active)]);
 
 export const crushers = pgTable('crushers', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -48,6 +64,14 @@ export const equipment = pgTable('equipment', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex('equipment_vendor_type_unit_uq').on(t.vendorId, t.type, t.unitNo), index('equipment_vendor_idx').on(t.vendorId), index('equipment_active_idx').on(t.active)]);
 
+export const equipmentMaterialScopes = pgTable('equipment_material_scopes', {
+  equipmentId: uuid('equipment_id').notNull().references(() => equipment.id, { onDelete: 'cascade' }),
+  materialKind: materialKindEnum('material_kind').notNull(),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.equipmentId, t.materialKind], name: 'equipment_material_scopes_pk' }), index('equipment_material_scope_kind_idx').on(t.materialKind, t.active)]);
+
 export const sources = pgTable('sources', {
   id: uuid('id').primaryKey().defaultRandom(),
   code: text('code').notNull(),
@@ -59,7 +83,7 @@ export const sources = pgTable('sources', {
   active: boolean('active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [uniqueIndex('sources_code_uq').on(t.code), index('sources_kind_idx').on(t.materialKind), index('sources_active_idx').on(t.active)]);
+}, (t) => [uniqueIndex('sources_kind_code_uq').on(t.materialKind, t.code), index('sources_kind_idx').on(t.materialKind), index('sources_active_idx').on(t.active)]);
 
 export const piles = pgTable('piles', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -71,7 +95,7 @@ export const piles = pgTable('piles', {
   active: boolean('active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [uniqueIndex('piles_code_uq').on(t.code), index('piles_active_idx').on(t.active)]);
+}, (t) => [uniqueIndex('piles_kind_code_uq').on(t.materialKind, t.code), index('piles_active_idx').on(t.active)]);
 
 export const shifts = pgTable('shifts', {
   code: text('code').primaryKey(),

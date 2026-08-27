@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import {
-  ChemistryRevisionRequestSchema, CreateRawSampleRequestSchema, ImportRawSamplesRequestSchema, MixListQuerySchema, MixSummaryQuerySchema,
+  ClayWorkbenchQuerySchema, ChemistryRevisionRequestSchema, CreateRawSampleRequestSchema, ImportRawSamplesRequestSchema, MixListQuerySchema, MixSummaryQuerySchema,
   PileCumulativeQuerySchema, QafQuerySchema, RawSampleListQuerySchema, ReplaceMixRequestSchema, SaveMixRequestSchema, UpdateRawSampleRequestSchema, WorkbenchSamplesQuerySchema,
 } from '@qc/contracts';
 import { AppError } from '../../lib/errors';
@@ -19,6 +19,7 @@ export async function registerQcRoutes(app:FastifyInstance,service:QcService){
   app.post('/samples/import',qcWrite,async(request)=>({ok:true as const,result:await service.importSamples(request.principal!,ImportRawSamplesRequestSchema.parse(request.body),request.id)}));
 
   app.get('/workbench/samples',qcRead,async(request)=>{const q=WorkbenchSamplesQuerySchema.parse(request.query);return{ok:true as const,items:await service.loadWorkbenchSamples(q.materialKind,q.operationDate)};});
+  app.get('/workbench/clay-retase',qcRead,async(request)=>{const q=ClayWorkbenchQuerySchema.parse(request.query);return{ok:true as const,items:await service.loadClayRetase(q.operationDate,q.shiftCode)};});
 
   app.get('/mixes',qcRead,async(request)=>{const q=MixListQuerySchema.parse(request.query);return{ok:true as const,...await service.listMixes(q)};});
   app.get('/mixes/:mixCode',qcRead,async(request)=>({ok:true as const,item:await service.getMix(decodeURIComponent(param(request,'mixCode')))}));

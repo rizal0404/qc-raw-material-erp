@@ -38,7 +38,8 @@ export function createRetaseService(repository:RetaseEventRepository,master:Mast
     return {
       id:event.id,requestId:event.requestId,operationDate:event.operationDate,eventTs:event.eventTs.toISOString(),shiftCode:event.shiftCode,crusherId:event.crusherId,crusherCode:event.crusherCode,crusherName:event.crusherName,
       vendorId:event.vendorId,vendorName:event.vendorName??event.vendorNameSnapshot,reportId:event.reportId,reportVersion:event.reportVersion,assignmentId:event.assignmentId,assignmentAaId:event.assignmentAaId,assignmentOrigin:event.assignmentOrigin,
-      amId:event.amId,amUnitNo:event.amUnitNoSnapshot,aaId:event.aaId,aaUnitNo:event.aaUnitNoSnapshot,sourceId:event.sourceId,sourceCode:event.sourceCode,pileId:event.pileId,pileCode:event.pileCode,pileName:event.pileName,blockSnapshot:event.blockSnapshot,
+      clayReportId:event.clayReportId,clayReportColumnId:event.clayReportColumnId,entrySource:event.entrySource,entryBatchId:event.entryBatchId,
+      amId:event.amId,amUnitNo:event.amUnitNoSnapshot,aaId:event.aaId,aaUnitNo:event.aaUnitNoSnapshot,sourceId:event.sourceId,sourceCode:event.sourceCode,sourceName:event.sourceNameSnapshot,pileId:event.pileId,pileCode:event.pileCode,pileName:event.pileName,blockSnapshot:event.blockSnapshot,
       materialKind:event.materialKind,materialCategory:event.materialCategory,delta:event.delta,eventType:event.eventType,status:event.status,createdBy:event.createdBy,createdByName:event.createdByName,
       reversesEventId:event.reversesEventId,reason:event.reason,clientTs:iso(event.clientTs),canReverse,
     };
@@ -46,6 +47,7 @@ export function createRetaseService(repository:RetaseEventRepository,master:Mast
   function assertRecordIdempotency(existing:RetaseEventRecord,principal:AuthPrincipal,input:RecordRetaseEventRequest){
     if(existing.createdBy!==principal.userId||existing.operationDate!==input.operationDate||existing.shiftCode!==input.shiftCode||existing.crusherId!==input.crusherId||existing.eventType!=='DUMP')throw idempotencyConflict();
     if(input.assignmentAaId&&existing.assignmentAaId!==input.assignmentAaId)throw idempotencyConflict();
+    if(input.clayReportColumnId&&existing.clayReportColumnId!==input.clayReportColumnId)throw idempotencyConflict();
     if(input.aaId&&existing.aaId!==input.aaId)throw idempotencyConflict();
     if(input.unlistedUnitNo&&existing.aaUnitNoSnapshot&&existing.aaUnitNoSnapshot.trim().toUpperCase()!==input.unlistedUnitNo.trim().toUpperCase())throw idempotencyConflict();
   }
@@ -57,18 +59,19 @@ export function createRetaseService(repository:RetaseEventRepository,master:Mast
     return {
       requestId:input.requestId,operationDate:input.operationDate,shiftCode:input.shiftCode,crusherId:input.crusherId,
       vendorId:resolution?.vendorId??manual.vendorId,reportId:resolution?.reportId??null,reportVersion:resolution?.reportVersion??null,assignmentId:resolution?.assignmentId??null,assignmentAaId:resolution?.assignmentAaId??null,assignmentOrigin:resolution?.assignmentOrigin??null,
+      clayReportId:null,clayReportColumnId:null,entrySource:'LIVE_COUNTER' as const,entryBatchId:null,
       amId:resolution?.amId??null,aaId:resolution?.aaId??manual.aaId,sourceId:resolution?.sourceId??null,pileId:resolution?.pileId??null,blockSnapshot:resolution?.blockSnapshot??null,materialKind:resolution?.materialKind??null,materialCategory:resolution?.materialCategory??null,
-      vendorNameSnapshot:resolution?.vendorName??manual.vendorName,amUnitNoSnapshot:resolution?.amUnitNo??null,aaUnitNoSnapshot:resolution?.aaUnitNo??manual.aaUnitNo,
+      vendorNameSnapshot:resolution?.vendorName??manual.vendorName,sourceNameSnapshot:resolution?.sourceName??null,amUnitNoSnapshot:resolution?.amUnitNo??null,aaUnitNoSnapshot:resolution?.aaUnitNo??manual.aaUnitNo,
       delta:1 as const,eventType:'DUMP' as const,status,createdBy:principal.userId,reversesEventId:null,reason:clean(input.reason),clientTs:input.clientTs?new Date(input.clientTs):null,
     };
   }
 
   async function prepareOperational(principal:AuthPrincipal,input:OperationalAssignmentInput|({vendorId?:string|undefined;operationDate:string;shiftCode:ShiftCode}&UpdateOperationalAssignmentRequest),excludeId?:string):Promise<OperationalAssignmentWriteRecord>{
     const vendorId=effectiveConfigVendor(principal,input.vendorId);const [vendor,am,source,c,pile,shift]=await Promise.all([master.findVendorById(vendorId),master.findEquipmentById(input.amId),input.sourceId?master.findSourceById(input.sourceId):Promise.resolve(null),master.findCrusherById(input.crusherId),input.pileId?master.findPileById(input.pileId):Promise.resolve(null),shiftByCode(input.shiftCode)]);
-    if(!vendor||!vendor.active)throw notFound('Vendor tidak ditemukan/aktif.');if(!am||!am.active||am.type!=='AM')throw new AppError(400,'INVALID_AM','AM tidak ditemukan/aktif.');if(am.vendorId!==vendorId)throw new AppError(400,'EQUIPMENT_VENDOR_MISMATCH','AM bukan milik vendor yang dipilih.');if(!c||!c.active)throw new AppError(400,'INVALID_CRUSHER','Crusher tidak ditemukan/aktif.');
+    if(!vendor||!vendor.active)throw notFound('Vendor tidak ditemukan/aktif.');if(!am||!am.active||am.type!=='AM')throw new AppError(400,'INVALID_AM','AM tidak ditemukan/aktif.');if(am.vendorId!==vendorId)throw new AppError(400,'EQUIPMENT_VENDOR_MISMATCH','AM bukan milik vendor yang dipilih.');if(!c||!c.active)throw new AppError(400,'INVALID_CRUSHER','Crusher tidak ditemukan/aktif.');if(!vendor.materialKinds.includes(c.materialKind)||!am.materialKinds.includes(c.materialKind))throw new AppError(400,'MATERIAL_SCOPE_MISMATCH','Vendor atau AM tidak tersedia untuk material crusher.');
     if(source&&(!source.active||source.materialKind!==c.materialKind))throw new AppError(400,'SOURCE_MATERIAL_MISMATCH','Source tidak aktif atau berbeda material dengan crusher.');if(!source&&c.materialKind!=='CL')throw new AppError(400,'SOURCE_REQUIRED','Assignment tanpa Source hanya diizinkan untuk Clay.');
     if(input.pileId&&!pile)throw new AppError(400,'INVALID_PILE','Pile tidak ditemukan.');if(pile&&(!pile.active||pile.materialKind!==c.materialKind))throw new AppError(400,'PILE_MATERIAL_MISMATCH','Pile tidak aktif atau berbeda material dengan crusher.');if(pile&&pile.plantId&&c.plantId&&pile.plantId!==c.plantId)throw new AppError(400,'PILE_PLANT_MISMATCH','Pile dan crusher berada pada plant berbeda.');
-    const aaIds=[...new Set(input.aaIds)];for(const aaId of aaIds){const aa=await master.findEquipmentById(aaId);if(!aa||!aa.active||aa.type!=='AA')throw new AppError(400,'INVALID_AA','AA tidak ditemukan/aktif.');if(aa.vendorId!==vendorId)throw new AppError(400,'EQUIPMENT_VENDOR_MISMATCH',`AA ${aa.unitNo} bukan milik vendor yang dipilih.`);const candidates=await repository.listAssignmentCandidatesForAa({operationDate:input.operationDate,shiftCode:input.shiftCode,crusherId:input.crusherId,aaId});const wanted=assignmentInterval({validFrom:input.validFrom??null,validTo:input.validTo??null},shift);if(candidates.some(x=>x.assignmentId!==excludeId&&overlaps(wanted,assignmentInterval({validFrom:x.validFrom,validTo:x.validTo},shift))))throw new AppError(409,'AA_ROUTE_OVERLAP',`AA ${aa.unitNo} sudah memiliki route aktif yang overlap pada crusher yang sama.`);}
+    const aaIds=[...new Set(input.aaIds)];for(const aaId of aaIds){const aa=await master.findEquipmentById(aaId);if(!aa||!aa.active||aa.type!=='AA')throw new AppError(400,'INVALID_AA','AA tidak ditemukan/aktif.');if(aa.vendorId!==vendorId)throw new AppError(400,'EQUIPMENT_VENDOR_MISMATCH',`AA ${aa.unitNo} bukan milik vendor yang dipilih.`);if(!aa.materialKinds.includes(c.materialKind))throw new AppError(400,'MATERIAL_SCOPE_MISMATCH',`AA ${aa.unitNo} tidak tersedia untuk ${c.materialKind}.`);const candidates=await repository.listAssignmentCandidatesForAa({operationDate:input.operationDate,shiftCode:input.shiftCode,crusherId:input.crusherId,aaId});const wanted=assignmentInterval({validFrom:input.validFrom??null,validTo:input.validTo??null},shift);if(candidates.some(x=>x.assignmentId!==excludeId&&overlaps(wanted,assignmentInterval({validFrom:x.validFrom,validTo:x.validTo},shift))))throw new AppError(409,'AA_ROUTE_OVERLAP',`AA ${aa.unitNo} sudah memiliki route aktif yang overlap pada crusher yang sama.`);}
     assignmentInterval({validFrom:input.validFrom??null,validTo:input.validTo??null},shift);
     return {operationDate:input.operationDate,shiftCode:input.shiftCode,vendorId,amId:input.amId,sourceId:source?.id??null,crusherId:c.id,pileId:pile?.id??null,blockSnapshot:clean(input.blockSnapshot)??source?.block??null,materialKind:c.materialKind,materialCategory:source?.materialCategory??clean(input.materialCategory)??'CLAY',validFrom:input.validFrom??null,validTo:input.validTo??null,note:clean(input.note),aaIds};
   }
@@ -95,7 +98,15 @@ export function createRetaseService(repository:RetaseEventRepository,master:Mast
 
     async record(principal:AuthPrincipal,input:RecordRetaseEventRequest){
       const existing=await repository.findByRequestId(input.requestId);if(existing){assertRecordIdempotency(existing,principal,input);return {item:eventDto(existing,false),idempotent:true};}
-      const current=await assertLive(principal,input);let resolution:AssignmentAaResolutionRecord|null=null;let status:'VALID'|'EXCEPTION_UNASSIGNED'|'AMBIGUOUS'='VALID';
+      const current=await assertLive(principal,input);
+      if(input.clayReportColumnId){
+        const column=await repository.getClayCounterColumn(input.clayReportColumnId);if(!column)throw notFound('Kolom laporan Clay tidak ditemukan.');
+        if(column.operationDate!==input.operationDate||column.shiftCode!==input.shiftCode||column.crusherId!==input.crusherId)throw new AppError(409,'CLAY_COLUMN_CONTEXT_MISMATCH','Kolom Clay tidak sesuai date/shift/crusher counter.');
+        if(column.reportStatus!=='DRAFT'||column.columnStatus==='INACTIVE')throw new AppError(409,'CLAY_COLUMN_NOT_ACTIVE','Kolom atau laporan Clay tidak aktif untuk counter.');
+        const write={requestId:input.requestId,operationDate:input.operationDate,shiftCode:input.shiftCode,crusherId:input.crusherId,vendorId:column.vendorId,reportId:null,reportVersion:null,assignmentId:null,assignmentAaId:null,assignmentOrigin:null,clayReportId:column.reportId,clayReportColumnId:column.id,entrySource:'LIVE_COUNTER' as const,entryBatchId:null,amId:null,aaId:null,sourceId:column.sourceId,pileId:column.pileId,blockSnapshot:null,materialKind:'CL' as const,materialCategory:'CLAY',vendorNameSnapshot:column.vendorName,sourceNameSnapshot:column.sourceName,amUnitNoSnapshot:null,aaUnitNoSnapshot:null,delta:1 as const,eventType:'DUMP' as const,status:'VALID' as const,createdBy:principal.userId,reversesEventId:null,reason:clean(input.reason),clientTs:input.clientTs?new Date(input.clientTs):null};
+        try{const created=await repository.appendEvent(write);return{item:eventDto(created,false),idempotent:false};}catch(error){const raced=await repository.findByRequestId(input.requestId);if(raced){assertRecordIdempotency(raced,principal,input);return{item:eventDto(raced,false),idempotent:true};}throw error;}
+      }
+      let resolution:AssignmentAaResolutionRecord|null=null;let status:'VALID'|'EXCEPTION_UNASSIGNED'|'AMBIGUOUS'='VALID';
       let manual={vendorId:null as string|null,vendorName:null as string|null,aaId:null as string|null,aaUnitNo:clean(input.unlistedUnitNo)};
 
       if(input.assignmentAaId){

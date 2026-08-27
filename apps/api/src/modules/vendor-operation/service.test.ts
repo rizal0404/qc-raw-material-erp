@@ -13,10 +13,10 @@ const principal:AuthPrincipal={sessionId:'s',userId:'66666666-6666-4666-8666-666
 
 function masterStub():MasterRepository{
   return {
-    async findVendorById(id:string){return id===vendorId?{id:vendorId,code:'V001',name:'Vendor 1',aliases:[],contactEmail:null,active:true,createdAt:new Date(),updatedAt:new Date()}:null},
+    async findVendorById(id:string){return id===vendorId?{id:vendorId,code:'V001',name:'Vendor 1',aliases:[],contactEmail:null,materialKinds:['LS'],active:true,createdAt:new Date(),updatedAt:new Date()}:null},
     async findEquipmentById(id:string){
-      if(id===amId)return{id:amId,vendorId,vendorCode:'V001',vendorName:'Vendor 1',type:'AM',unitNo:'AM01',brand:null,model:null,aliases:[],active:true,createdAt:new Date(),updatedAt:new Date()};
-      if(id===aaId)return{id:aaId,vendorId,vendorCode:'V001',vendorName:'Vendor 1',type:'AA',unitNo:'AA01',brand:null,model:null,aliases:[],active:true,createdAt:new Date(),updatedAt:new Date()};
+      if(id===amId)return{id:amId,vendorId,vendorCode:'V001',vendorName:'Vendor 1',type:'AM',unitNo:'AM01',brand:null,model:null,aliases:[],materialKinds:['LS'],active:true,createdAt:new Date(),updatedAt:new Date()};
+      if(id===aaId)return{id:aaId,vendorId,vendorCode:'V001',vendorName:'Vendor 1',type:'AA',unitNo:'AA01',brand:null,model:null,aliases:[],materialKinds:['LS'],active:true,createdAt:new Date(),updatedAt:new Date()};
       return null;
     },
     async findSourceById(id:string){return id===sourceId?{id:sourceId,code:'SRC',name:'B9',block:'B9',materialCategory:'PILE',materialKind:'LS',aliases:[],active:true,createdAt:new Date(),updatedAt:new Date()}:null},
@@ -34,7 +34,7 @@ function repoStub():VendorShiftReportRepository{
     async list(){return{items:current?[current]:[],total:current?1:0}},
     async createDraft(input,actor){
       current={
-        id:'77777777-7777-4777-8777-777777777777',operationDate:input.operationDate,shiftCode:input.shiftCode,vendorId:input.vendorId,vendorCode:'V001',vendorName:'Vendor 1',version:1,status:'DRAFT',
+        id:'77777777-7777-4777-8777-777777777777',operationDate:input.operationDate,shiftCode:input.shiftCode,vendorId:input.vendorId,vendorCode:'V001',vendorName:'Vendor 1',materialKind:input.materialKind,version:1,status:'DRAFT',
         am:input.am,aa:input.aa,note:input.note,revisionReason:null,revisesReportId:null,submittedAt:null,submittedBy:null,submittedByName:null,createdBy:actor,createdByName:'Vendor User',createdAt:new Date(),updatedAt:new Date(),
         assignments:input.assignments.map((a,i)=>({id:`88888888-8888-4888-8888-88888888888${i}`,reportId:'77777777-7777-4777-8777-777777777777',operationDate:input.operationDate,shiftCode:input.shiftCode,vendorId:input.vendorId,amId:a.amId,amUnitNo:'AM01',amBrand:null,amModel:null,sourceId:a.sourceId,sourceCode:'SRC',sourceName:'B9',blockSnapshot:a.blockSnapshot,materialCategory:a.materialCategory,materialKind:a.materialKind,crusherId:a.crusherId,crusherCode:'CR_LS_5',crusherName:'CR LS 5',pileId:a.pileId,pileCode:null,pileName:null,validFrom:a.validFrom,validTo:a.validTo,status:'ACTIVE',note:a.note,aa:a.aaIds.map(id=>({id,assignmentAaId:'99999999-9999-4999-8999-999999999999',unitNo:'AA01',brand:null,model:null}))})),
       };
@@ -50,8 +50,8 @@ function repoStub():VendorShiftReportRepository{
 describe('VendorOperationService regression',()=>{
   it('reloads the same draft by canonical business date after save',async()=>{
     const repo=repoStub();const service=createVendorOperationService(repo,masterStub());
-    const created=await service.createDraft(principal,{operationDate:'2026-08-20',shiftCode:'SHIFT_1',am:{total:1,operating:1,standby:0,breakdown:0,repair:0,other:0},aa:{total:1,operating:1,standby:0,breakdown:0,repair:0,other:0},assignments:[{amId,sourceId,crusherId,validFrom:'07:30',validTo:'15:30',aaIds:[aaId]}]});
-    const reloaded=await service.getCurrent(principal,{operationDate:'2026-08-20',shiftCode:'SHIFT_1'});
+    const created=await service.createDraft(principal,{operationDate:'2026-08-20',shiftCode:'SHIFT_1',materialKind:'LS',am:{total:1,operating:1,standby:0,breakdown:0,repair:0,other:0},aa:{total:1,operating:1,standby:0,breakdown:0,repair:0,other:0},assignments:[{amId,sourceId,crusherId,validFrom:'07:30',validTo:'15:30',aaIds:[aaId]}]});
+    const reloaded=await service.getCurrent(principal,{operationDate:'2026-08-20',shiftCode:'SHIFT_1',materialKind:'LS'});
     expect(reloaded?.id).toBe(created.id);
     expect(reloaded?.version).toBe(1);
     expect(reloaded?.operationDate).toBe('2026-08-20');
@@ -59,7 +59,7 @@ describe('VendorOperationService regression',()=>{
 
   it('accepts Shift 3 cross-midnight assignment',async()=>{
     const service=createVendorOperationService(repoStub(),masterStub());
-    const created=await service.createDraft(principal,{operationDate:'2026-08-20',shiftCode:'SHIFT_3',am:{total:1,operating:1,standby:0,breakdown:0,repair:0,other:0},aa:{total:1,operating:1,standby:0,breakdown:0,repair:0,other:0},assignments:[{amId,sourceId,crusherId,validFrom:'23:00',validTo:'01:00',aaIds:[aaId]}]});
+    const created=await service.createDraft(principal,{operationDate:'2026-08-20',shiftCode:'SHIFT_3',materialKind:'LS',am:{total:1,operating:1,standby:0,breakdown:0,repair:0,other:0},aa:{total:1,operating:1,standby:0,breakdown:0,repair:0,other:0},assignments:[{amId,sourceId,crusherId,validFrom:'23:00',validTo:'01:00',aaIds:[aaId]}]});
     expect(created.assignments[0]?.validTo).toBe('01:00');
   });
 });

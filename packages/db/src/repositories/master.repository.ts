@@ -4,7 +4,10 @@ import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { MasterRepository } from '@qc/domain';
 import type * as Schema from '../schema/index';
-import { auditLogs, crushers, equipment, piles, plants, shifts, sources, vendorAliases, vendors } from '../schema/index';
+import {
+  auditLogs, crushers, equipment, equipmentMaterialScopes, piles, plantMaterialScopes, plants, shifts, sources,
+  vendorAliases, vendorMaterialScopes, vendors,
+} from '../schema/index';
 
 function activePredicate(column: AnyPgColumn, active?: boolean): SQL | undefined {
   return active === undefined ? undefined : eq(column, active);
@@ -18,14 +21,30 @@ function normalizedSearch(search?: string): string | undefined {
 }
 
 export function createMasterRepository(db: PostgresJsDatabase<typeof Schema>): MasterRepository {
+  async function vendorKinds(id: string) {
+    const rows = await db.select({ materialKind: vendorMaterialScopes.materialKind }).from(vendorMaterialScopes)
+      .where(and(eq(vendorMaterialScopes.vendorId, id), eq(vendorMaterialScopes.active, true)));
+    return rows.map((row) => row.materialKind);
+  }
+  async function plantKinds(id: string) {
+    const rows = await db.select({ materialKind: plantMaterialScopes.materialKind }).from(plantMaterialScopes)
+      .where(and(eq(plantMaterialScopes.plantId, id), eq(plantMaterialScopes.active, true)));
+    return rows.map((row) => row.materialKind);
+  }
+  async function equipmentKinds(id: string) {
+    const rows = await db.select({ materialKind: equipmentMaterialScopes.materialKind }).from(equipmentMaterialScopes)
+      .where(and(eq(equipmentMaterialScopes.equipmentId, id), eq(equipmentMaterialScopes.active, true)));
+    return rows.map((row) => row.materialKind);
+  }
+
   async function vendorView(id: string) {
     const [row] = await db.select().from(vendors).where(eq(vendors.id, id)).limit(1);
-    return row ?? null;
+    return row ? { ...row, materialKinds: await vendorKinds(row.id) } : null;
   }
 
   async function plantView(id: string) {
     const [row] = await db.select().from(plants).where(eq(plants.id, id)).limit(1);
-    return row ?? null;
+    return row ? { ...row, materialKinds: await plantKinds(row.id) } : null;
   }
 
   async function crusherView(id: string) {
@@ -43,7 +62,7 @@ export function createMasterRepository(db: PostgresJsDatabase<typeof Schema>): M
       type: equipment.type, unitNo: equipment.unitNo, brand: equipment.brand, model: equipment.model,
       aliases: equipment.aliases, active: equipment.active, createdAt: equipment.createdAt, updatedAt: equipment.updatedAt,
     }).from(equipment).innerJoin(vendors, eq(vendors.id, equipment.vendorId)).where(eq(equipment.id, id)).limit(1);
-    return row ?? null;
+    return row ? { ...row, materialKinds: await equipmentKinds(row.id) } : null;
   }
 
   async function sourceView(id: string) {
@@ -65,67 +84,99 @@ export function createMasterRepository(db: PostgresJsDatabase<typeof Schema>): M
       const search = normalizedSearch(filter.search);
       const where = and(
         activePredicate(vendors.active, filter.active),
+        filter.materialKind ? sql`exists (select 1 from ${vendorMaterialScopes} vms where vms.vendor_id = ${vendors.id} and vms.material_kind = ${filter.materialKind} and vms.active)` : undefined,
         search ? or(ilike(vendors.code, search), ilike(vendors.name, search), sql`array_to_string(${vendors.aliases}, ' ') ILIKE ${search}`) : undefined,
       );
       const [items, totalRows] = await Promise.all([
         db.select().from(vendors).where(where).orderBy(asc(vendors.name)).limit(filter.limit).offset(filter.offset),
         db.select({ value: count() }).from(vendors).where(where),
       ]);
-      return { items, total: Number(totalRows[0]?.value ?? 0) };
+      return { items: await Promise.all(items.map(async (row) => ({ ...row, materialKinds: await vendorKinds(row.id) }))), total: Number(totalRows[0]?.value ?? 0) };
     },
     findVendorById: vendorView,
     async findVendorByCode(code) {
       const [row] = await db.select().from(vendors).where(sql`lower(${vendors.code}) = lower(${code})`).limit(1);
-      return row ?? null;
+      return row ? vendorView(row.id) : null;
     },
     async findVendorByAlias(normalizedAlias) {
       const [row] = await db.select({ vendorId: vendorAliases.vendorId }).from(vendorAliases).where(eq(vendorAliases.normalizedAlias, normalizedAlias)).limit(1);
       return row ? vendorView(row.vendorId) : null;
     },
     async createVendor(input) {
-      return db.transaction(async (tx) => {
-        const [row] = await tx.insert(vendors).values(input).returning();
+      const id = await db.transaction(async (tx) => {
+        const { materialKinds, ...vendorInput } = input;
+        const [row] = await tx.insert(vendors).values(vendorInput).returning();
         if (!row) throw new Error('Failed to create vendor');
         if (input.aliases.length) {
           await tx.insert(vendorAliases).values(input.aliases.map((alias) => ({ vendorId: row.id, alias, normalizedAlias: normalizeAlias(alias) })));
         }
-        return row;
+        await tx.insert(vendorMaterialScopes).values(materialKinds.map((materialKind) => ({ vendorId: row.id, materialKind })));
+        return row.id;
       });
+      const created = await vendorView(id);
+      if (!created) throw new Error('Failed to reload vendor');
+      return created;
     },
     async updateVendor(id, patch) {
-      return db.transaction(async (tx) => {
-        const [row] = await tx.update(vendors).set({ ...patch, updatedAt: new Date() }).where(eq(vendors.id, id)).returning();
+      const updatedId = await db.transaction(async (tx) => {
+        const { materialKinds, ...vendorPatch } = patch;
+        const [row] = await tx.update(vendors).set({ ...vendorPatch, updatedAt: new Date() }).where(eq(vendors.id, id)).returning();
         if (!row) return null;
         if (patch.aliases !== undefined) {
           await tx.delete(vendorAliases).where(eq(vendorAliases.vendorId, id));
           if (patch.aliases.length) await tx.insert(vendorAliases).values(patch.aliases.map((alias) => ({ vendorId: id, alias, normalizedAlias: normalizeAlias(alias) })));
         }
-        return row;
+        if (materialKinds !== undefined) {
+          await tx.delete(vendorMaterialScopes).where(eq(vendorMaterialScopes.vendorId, id));
+          await tx.insert(vendorMaterialScopes).values(materialKinds.map((materialKind) => ({ vendorId: id, materialKind })));
+        }
+        return row.id;
       });
+      return updatedId ? vendorView(updatedId) : null;
     },
 
     async listPlants(filter) {
       const search = normalizedSearch(filter.search);
-      const where = and(activePredicate(plants.active, filter.active), search ? or(ilike(plants.code, search), ilike(plants.name, search)) : undefined);
+      const where = and(
+        activePredicate(plants.active, filter.active),
+        filter.materialKind ? sql`exists (select 1 from ${plantMaterialScopes} pms where pms.plant_id = ${plants.id} and pms.material_kind = ${filter.materialKind} and pms.active)` : undefined,
+        search ? or(ilike(plants.code, search), ilike(plants.name, search)) : undefined,
+      );
       const [items, totalRows] = await Promise.all([
         db.select().from(plants).where(where).orderBy(asc(plants.name)).limit(filter.limit).offset(filter.offset),
         db.select({ value: count() }).from(plants).where(where),
       ]);
-      return { items, total: Number(totalRows[0]?.value ?? 0) };
+      return { items: await Promise.all(items.map(async (row) => ({ ...row, materialKinds: await plantKinds(row.id) }))), total: Number(totalRows[0]?.value ?? 0) };
     },
     findPlantById: plantView,
     async findPlantByCode(code) {
       const [row] = await db.select().from(plants).where(sql`lower(${plants.code}) = lower(${code})`).limit(1);
-      return row ?? null;
+      return row ? plantView(row.id) : null;
     },
     async createPlant(input) {
-      const [row] = await db.insert(plants).values(input).returning();
-      if (!row) throw new Error('Failed to create plant');
-      return row;
+      const id = await db.transaction(async (tx) => {
+        const { materialKinds, ...plantInput } = input;
+        const [row] = await tx.insert(plants).values(plantInput).returning({ id: plants.id });
+        if (!row) throw new Error('Failed to create plant');
+        await tx.insert(plantMaterialScopes).values(materialKinds.map((materialKind) => ({ plantId: row.id, materialKind })));
+        return row.id;
+      });
+      const created = await plantView(id);
+      if (!created) throw new Error('Failed to reload plant');
+      return created;
     },
     async updatePlant(id, patch) {
-      const [row] = await db.update(plants).set({ ...patch, updatedAt: new Date() }).where(eq(plants.id, id)).returning();
-      return row ?? null;
+      const updatedId = await db.transaction(async (tx) => {
+        const { materialKinds, ...plantPatch } = patch;
+        const [row] = await tx.update(plants).set({ ...plantPatch, updatedAt: new Date() }).where(eq(plants.id, id)).returning({ id: plants.id });
+        if (!row) return null;
+        if (materialKinds !== undefined) {
+          await tx.delete(plantMaterialScopes).where(eq(plantMaterialScopes.plantId, id));
+          await tx.insert(plantMaterialScopes).values(materialKinds.map((materialKind) => ({ plantId: id, materialKind })));
+        }
+        return row.id;
+      });
+      return updatedId ? plantView(updatedId) : null;
     },
 
     async listCrushers(filter) {
@@ -166,6 +217,7 @@ export function createMasterRepository(db: PostgresJsDatabase<typeof Schema>): M
         activePredicate(equipment.active, filter.active),
         filter.vendorId ? eq(equipment.vendorId, filter.vendorId) : undefined,
         filter.type ? eq(equipment.type, filter.type) : undefined,
+        filter.materialKind ? sql`exists (select 1 from ${equipmentMaterialScopes} ems where ems.equipment_id = ${equipment.id} and ems.material_kind = ${filter.materialKind} and ems.active)` : undefined,
         search ? or(ilike(equipment.unitNo, search), ilike(equipment.brand, search), ilike(equipment.model, search), ilike(vendors.name, search)) : undefined,
       );
       const selection = { id: equipment.id, vendorId: equipment.vendorId, vendorCode: vendors.code, vendorName: vendors.name, type: equipment.type, unitNo: equipment.unitNo, brand: equipment.brand, model: equipment.model, aliases: equipment.aliases, active: equipment.active, createdAt: equipment.createdAt, updatedAt: equipment.updatedAt };
@@ -173,7 +225,7 @@ export function createMasterRepository(db: PostgresJsDatabase<typeof Schema>): M
         db.select(selection).from(equipment).innerJoin(vendors, eq(vendors.id, equipment.vendorId)).where(where).orderBy(asc(vendors.name), asc(equipment.type), asc(equipment.unitNo)).limit(filter.limit).offset(filter.offset),
         db.select({ value: count() }).from(equipment).innerJoin(vendors, eq(vendors.id, equipment.vendorId)).where(where),
       ]);
-      return { items, total: Number(totalRows[0]?.value ?? 0) };
+      return { items: await Promise.all(items.map(async (row) => ({ ...row, materialKinds: await equipmentKinds(row.id) }))), total: Number(totalRows[0]?.value ?? 0) };
     },
     findEquipmentById: equipmentView,
     async findEquipmentByBusinessKey(vendorId, type, unitNo) {
@@ -181,15 +233,29 @@ export function createMasterRepository(db: PostgresJsDatabase<typeof Schema>): M
       return row ? equipmentView(row.id) : null;
     },
     async createEquipment(input) {
-      const [row] = await db.insert(equipment).values(input).returning({ id: equipment.id });
-      if (!row) throw new Error('Failed to create equipment');
-      const created = await equipmentView(row.id);
+      const id = await db.transaction(async (tx) => {
+        const { materialKinds, ...equipmentInput } = input;
+        const [row] = await tx.insert(equipment).values(equipmentInput).returning({ id: equipment.id });
+        if (!row) throw new Error('Failed to create equipment');
+        await tx.insert(equipmentMaterialScopes).values(materialKinds.map((materialKind) => ({ equipmentId: row.id, materialKind })));
+        return row.id;
+      });
+      const created = await equipmentView(id);
       if (!created) throw new Error('Failed to reload equipment');
       return created;
     },
     async updateEquipment(id, patch) {
-      const [row] = await db.update(equipment).set({ ...patch, updatedAt: new Date() }).where(eq(equipment.id, id)).returning({ id: equipment.id });
-      return row ? equipmentView(row.id) : null;
+      const updatedId = await db.transaction(async (tx) => {
+        const { materialKinds, ...equipmentPatch } = patch;
+        const [row] = await tx.update(equipment).set({ ...equipmentPatch, updatedAt: new Date() }).where(eq(equipment.id, id)).returning({ id: equipment.id });
+        if (!row) return null;
+        if (materialKinds !== undefined) {
+          await tx.delete(equipmentMaterialScopes).where(eq(equipmentMaterialScopes.equipmentId, id));
+          await tx.insert(equipmentMaterialScopes).values(materialKinds.map((materialKind) => ({ equipmentId: id, materialKind })));
+        }
+        return row.id;
+      });
+      return updatedId ? equipmentView(updatedId) : null;
     },
 
     async listSources(filter) {
@@ -207,8 +273,8 @@ export function createMasterRepository(db: PostgresJsDatabase<typeof Schema>): M
       return { items, total: Number(totalRows[0]?.value ?? 0) };
     },
     findSourceById: sourceView,
-    async findSourceByCode(code) {
-      const [row] = await db.select().from(sources).where(sql`lower(${sources.code}) = lower(${code})`).limit(1);
+    async findSourceByCode(code, materialKind) {
+      const [row] = await db.select().from(sources).where(and(sql`lower(${sources.code}) = lower(${code})`, materialKind ? eq(sources.materialKind, materialKind) : undefined)).limit(1);
       return row ?? null;
     },
     async createSource(input) {
@@ -237,8 +303,8 @@ export function createMasterRepository(db: PostgresJsDatabase<typeof Schema>): M
       return { items, total: Number(totalRows[0]?.value ?? 0) };
     },
     findPileById: pileView,
-    async findPileByCode(code) {
-      const [row] = await db.select({ id: piles.id }).from(piles).where(sql`lower(${piles.code}) = lower(${code})`).limit(1);
+    async findPileByCode(code, materialKind) {
+      const [row] = await db.select({ id: piles.id }).from(piles).where(and(sql`lower(${piles.code}) = lower(${code})`, materialKind ? eq(piles.materialKind, materialKind) : undefined)).limit(1);
       return row ? pileView(row.id) : null;
     },
     async createPile(input) {

@@ -44,6 +44,7 @@ export interface VendorShiftReportRecord {
   vendorId: string;
   vendorCode: string;
   vendorName: string;
+  materialKind: MaterialKind;
   version: number;
   status: ShiftReportStatus;
   am: FleetSummary;
@@ -79,6 +80,7 @@ export interface ShiftReportWriteRecord {
   operationDate: string;
   shiftCode: ShiftCode;
   vendorId: string;
+  materialKind: MaterialKind;
   am: FleetSummary;
   aa: FleetSummary;
   note: string | null;
@@ -90,6 +92,7 @@ export interface ShiftReportListFilter {
   operationDate?: string;
   shiftCode?: ShiftCode;
   status?: ShiftReportStatus;
+  materialKind?: MaterialKind;
   limit: number;
   offset: number;
 }

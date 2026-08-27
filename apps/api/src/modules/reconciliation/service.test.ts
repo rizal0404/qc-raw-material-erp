@@ -127,6 +127,16 @@ function repository(overrides: Partial<ReconciliationRepository> = {}): Reconcil
 }
 
 describe('Slice 06 reconciliation service', () => {
+  it('does not expose the reconciliation workflow for Clay',async()=>{
+    const repo=repository();const service=createReconciliationService(repo);
+    await expect(service.list(principal,{operationDate:'2026-08-27',materialKind:'CL'})).rejects.toMatchObject({code:'CLAY_DIRECT_WORKFLOW'});
+    expect(await service.workbenchSuggestions(principal,{operationDate:'2026-08-27',materialKind:'CL'})).toEqual([]);
+  });
+  it('rejects creating or confirming a Clay allocation',async()=>{
+    const repo=repository({getAssignment:vi.fn(async()=>({...baseAssignment,materialKind:'CL' as const}))});const service=createReconciliationService(repo);
+    await expect(service.createAllocation(principal,{assignmentId,sampleId:sampleA,approvedRetase:1})).rejects.toMatchObject({code:'CLAY_DIRECT_WORKFLOW'});
+    await expect(service.confirm(principal,allocationId,{approvedRetase:1})).rejects.toMatchObject({code:'CLAY_DIRECT_WORKFLOW'});
+  });
   it('derives SUGGESTED when exactly one Vendor candidate exists', async () => {
     const service = createReconciliationService(repository());
     const result = await service.list(principal, { operationDate: '2026-08-20' });

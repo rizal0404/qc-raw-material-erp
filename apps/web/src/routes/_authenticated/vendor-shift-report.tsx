@@ -3,7 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import type { CounterAssignment, FleetSummary, OperationalAssignmentInput, ShiftAssignmentInput, ShiftCode, ShiftReport, ShiftReportDraftInput } from '@qc/contracts';
 import { authQueryOptions } from '../../features/auth/auth-query';
-import { masterLookups } from '../../features/qc/qc-api';
+import { useMaterial, useMaterialLookups } from '../../features/navigation/material-context';
+import { useDraftGuard } from '../../features/navigation/use-draft-guard';
+import { materialNames } from '../../features/navigation/workflow';
 import {
   createShiftReport, createShiftReportRevision, equipmentLookup, getCurrentShiftReport, listShiftReports, submitShiftReport, updateShiftReportDraft,
 } from '../../features/vendor/vendor-api';
@@ -40,17 +42,17 @@ function FleetEditor({title,value,onChange,readonly=false}:{title:string;value:F
 }
 
 function VendorShiftReportPage(){
-  const qc=useQueryClient();const auth=useQuery(authQueryOptions);const user=auth.data?.user;const lookups=useQuery({queryKey:['lookups','master'],queryFn:masterLookups});
+  const qc=useQueryClient();const auth=useQuery(authQueryOptions);const user=auth.data?.user;const materialKind=useMaterial();const lookups=useMaterialLookups();
   const [operationDate,setOperationDate]=useState(today());const [shiftCode,setShiftCode]=useState<ShiftCode>('SHIFT_1');const [selectedVendorId,setSelectedVendorId]=useState(user?.vendorId??'');const [editor,setEditor]=useState<EditorState>(blankEditor());const [message,setMessage]=useState('Ready');const [revisionReason,setRevisionReason]=useState('');const [operational,setOperational]=useState<LocalAssignment>(newAssignment());const [operationalEditId,setOperationalEditId]=useState<string|null>(null);
   const effectiveVendorId=user?.role==='VENDOR'?(user.vendorId??''):selectedVendorId;
   useEffect(()=>{if(user?.role==='VENDOR'&&user.vendorId)setSelectedVendorId(user.vendorId)},[user?.role,user?.vendorId]);
-  useEffect(()=>{setEditor(blankEditor());setOperational(newAssignment());setOperationalEditId(null);setMessage('Loading context...')},[operationDate,shiftCode,effectiveVendorId]);
+  useEffect(()=>{setEditor(blankEditor());setOperational(newAssignment());setOperationalEditId(null);setMessage('Loading context...')},[operationDate,shiftCode,materialKind,effectiveVendorId]);
 
-  const current=useQuery({queryKey:['vendor-shift-current',effectiveVendorId,operationDate,shiftCode],queryFn:()=>getCurrentShiftReport({...(effectiveVendorId?{vendorId:effectiveVendorId}:{}),operationDate,shiftCode}),enabled:!!effectiveVendorId&&!!operationDate});
-  const history=useQuery({queryKey:['vendor-shift-history',effectiveVendorId,operationDate,shiftCode],queryFn:()=>listShiftReports({...(effectiveVendorId?{vendorId:effectiveVendorId}:{}),operationDate,shiftCode,limit:50,offset:0}),enabled:!!effectiveVendorId&&!!operationDate});
-  const amLookup=useQuery({queryKey:['equipment-lookup',effectiveVendorId,'AM'],queryFn:()=>equipmentLookup(effectiveVendorId,'AM'),enabled:!!effectiveVendorId});
-  const aaLookup=useQuery({queryKey:['equipment-lookup',effectiveVendorId,'AA'],queryFn:()=>equipmentLookup(effectiveVendorId,'AA'),enabled:!!effectiveVendorId});
-  const operationalList=useQuery({queryKey:['operational-assignments',effectiveVendorId,operationDate,shiftCode],queryFn:()=>listOperationalAssignments({vendorId:effectiveVendorId,operationDate,shiftCode}),enabled:!!effectiveVendorId&&['VENDOR','QC_ANALYST','SUPERVISOR_ADMIN'].includes(user?.role??'')});
+  const current=useQuery({queryKey:['vendor-shift-current',effectiveVendorId,operationDate,shiftCode,materialKind],queryFn:()=>getCurrentShiftReport({...(effectiveVendorId?{vendorId:effectiveVendorId}:{}),operationDate,shiftCode,materialKind}),enabled:!!effectiveVendorId&&!!operationDate});
+  const history=useQuery({queryKey:['vendor-shift-history',effectiveVendorId,operationDate,shiftCode,materialKind],queryFn:()=>listShiftReports({...(effectiveVendorId?{vendorId:effectiveVendorId}:{}),operationDate,shiftCode,materialKind,limit:50,offset:0}),enabled:!!effectiveVendorId&&!!operationDate});
+  const amLookup=useQuery({queryKey:['equipment-lookup',effectiveVendorId,'AM',materialKind],queryFn:()=>equipmentLookup(effectiveVendorId,'AM',materialKind),enabled:!!effectiveVendorId});
+  const aaLookup=useQuery({queryKey:['equipment-lookup',effectiveVendorId,'AA',materialKind],queryFn:()=>equipmentLookup(effectiveVendorId,'AA',materialKind),enabled:!!effectiveVendorId});
+  const operationalList=useQuery({queryKey:['operational-assignments',effectiveVendorId,operationDate,shiftCode,materialKind],queryFn:async()=>{const result=await listOperationalAssignments({vendorId:effectiveVendorId,operationDate,shiftCode});return {...result,items:result.items.filter(item=>item.materialKind===materialKind)}},enabled:!!effectiveVendorId&&['VENDOR','QC_ANALYST','SUPERVISOR_ADMIN'].includes(user?.role??'')});
 
   const report=current.data?.item??null;
   useEffect(()=>{if(current.data){setEditor(fromReport(current.data.item));setMessage(current.data.item?`Loaded ${current.data.item.status} · V${current.data.item.version}`:'Belum ada report untuk konteks ini.')}},[current.data]);
@@ -61,7 +63,7 @@ function VendorShiftReportPage(){
       if(!effectiveVendorId)throw new Error('Vendor wajib dipilih.');
       const assignments:ShiftAssignmentInput[]=editor.assignments.map(a=>({amId:a.amId,sourceId:a.sourceId,crusherId:a.crusherId,pileId:a.pileId||null,blockSnapshot:a.blockSnapshot||null,validFrom:a.validFrom||null,validTo:a.validTo||null,aaIds:a.aaIds,note:a.note||null}));
       if(report?.status==='DRAFT')return updateShiftReportDraft(report.id,{am:editor.am,aa:editor.aa,note:editor.note||null,assignments});
-      const body:ShiftReportDraftInput={vendorId:effectiveVendorId,operationDate,shiftCode,am:editor.am,aa:editor.aa,note:editor.note||null,assignments};
+      const body:ShiftReportDraftInput={vendorId:effectiveVendorId,operationDate,shiftCode,materialKind,am:editor.am,aa:editor.aa,note:editor.note||null,assignments};
       return createShiftReport(body);
     },
     onSuccess:async r=>{setMessage(`Draft tersimpan · V${r.item.version}`);setEditor(fromReport(r.item));await Promise.all([qc.invalidateQueries({queryKey:['vendor-shift-current']}),qc.invalidateQueries({queryKey:['vendor-shift-history']})]);},
@@ -72,18 +74,21 @@ function VendorShiftReportPage(){
   const saveOperationalMutation=useMutation({mutationFn:async()=>{if(!effectiveVendorId)throw new Error('Vendor wajib dipilih.');const body:OperationalAssignmentInput={vendorId:effectiveVendorId,operationDate,shiftCode,amId:operational.amId,sourceId:operational.sourceId||null,crusherId:operational.crusherId,pileId:operational.pileId||null,blockSnapshot:operational.blockSnapshot||null,validFrom:operational.validFrom||null,validTo:operational.validTo||null,aaIds:operational.aaIds,note:operational.note||null};if(operationalEditId){const {vendorId:_vendor,operationDate:_date,shiftCode:_shift,...update}=body;return updateOperationalAssignment(operationalEditId,update);}return createOperationalAssignment(body);},onSuccess:async r=>{setMessage(`Operational assignment ${operationalEditId?'diubah':'dibuat'} · ${r.item.crusherName}`);setOperational(newAssignment());setOperationalEditId(null);await Promise.all([qc.invalidateQueries({queryKey:['operational-assignments']}),qc.invalidateQueries({queryKey:['counter-assignments']}),qc.invalidateQueries({queryKey:['counter-context']})]);},onError:e=>setMessage(e.message)});
   const cancelOperationalMutation=useMutation({mutationFn:(id:string)=>cancelOperationalAssignment(id,'Assignment dibatalkan atau unit di-routing ulang.'),onSuccess:async()=>{setMessage('Operational assignment dibatalkan.');await Promise.all([qc.invalidateQueries({queryKey:['operational-assignments']}),qc.invalidateQueries({queryKey:['counter-assignments']}),qc.invalidateQueries({queryKey:['counter-context']})]);},onError:e=>setMessage(e.message)});
 
+  useDraftGuard(saveMutation.isPending||saveOperationalMutation.isPending||JSON.stringify(editor)!==JSON.stringify(fromReport(report))||!!operational.amId);
+
   function updateAssignment(index:number,patch:Partial<LocalAssignment>){setEditor(prev=>({...prev,assignments:prev.assignments.map((a,i)=>i===index?{...a,...patch}:a)}))}
   function addAssignment(){setEditor(prev=>({...prev,assignments:[...prev.assignments,newAssignment()]}))}
   function removeAssignment(index:number){setEditor(prev=>({...prev,assignments:prev.assignments.filter((_,i)=>i!==index)}))}
   const submitReady=useMemo(()=>fleetDiff(editor.am)===0&&fleetDiff(editor.aa)===0&&editor.assignments.length>0&&editor.assignments.every(a=>a.amId&&a.sourceId&&a.crusherId&&a.aaIds.length>0),[editor]);
-  const operationalSource=lookups.data?.sources.find(x=>x.id===operational.sourceId);const operationalCrusher=lookups.data?.crushers.find(x=>x.id===operational.crusherId);const operationalCrushers=(lookups.data?.crushers??[]).filter(x=>operationalSource?x.materialKind===operationalSource.materialKind:x.materialKind==='CL');const operationalPiles=(lookups.data?.piles??[]).filter(x=>(!operationalCrusher||x.materialKind===operationalCrusher.materialKind)&&(!operationalCrusher?.plantId||!x.plantId||x.plantId===operationalCrusher.plantId));const operationalAaSearch=operational.aaSearch.toLowerCase();const operationalAaItems=(aaLookup.data?.items??[]).filter(x=>!operationalAaSearch||`${x.unitNo} ${x.label}`.toLowerCase().includes(operationalAaSearch));const operationalReady=!!operational.amId&&!!operational.crusherId&&operational.aaIds.length>0&&(!!operational.sourceId||operationalCrusher?.materialKind==='CL');
+  const operationalSource=lookups.data?.sources.find(x=>x.id===operational.sourceId);const operationalCrusher=lookups.data?.crushers.find(x=>x.id===operational.crusherId);const operationalCrushers=(lookups.data?.crushers??[]).filter(x=>x.materialKind===materialKind&&(!operationalSource||x.materialKind===operationalSource.materialKind));const operationalPiles=(lookups.data?.piles??[]).filter(x=>(!operationalCrusher||x.materialKind===operationalCrusher.materialKind)&&(!operationalCrusher?.plantId||!x.plantId||x.plantId===operationalCrusher.plantId));const operationalAaSearch=operational.aaSearch.toLowerCase();const operationalAaItems=(aaLookup.data?.items??[]).filter(x=>!operationalAaSearch||`${x.unitNo} ${x.label}`.toLowerCase().includes(operationalAaSearch));const operationalReady=!!operational.amId&&!!operational.crusherId&&operational.aaIds.length>0&&(!!operational.sourceId||operationalCrusher?.materialKind==='CL');
 
   return <section className="page-stack vendor-shift-page">
-    <div className="page-heading"><div><p className="eyebrow">SLICE 04 / VENDOR OPERATION</p><h1>Vendor Shift Report</h1><p>Draft → reload → edit → submit → revision. Data assignment menjadi upstream source untuk Retase Counter.</p></div>{report&&<span className={`status-badge ${report.status==='SUBMITTED'?'success':report.status==='DRAFT'?'warning':'muted'}`}>{report.status} · V{report.version}</span>}</div>
+    <div className="page-heading"><div><p className="eyebrow">{materialNames[materialKind]} / OPERASI VENDOR</p><h1>Laporan Shift Vendor</h1><p>{materialKind==='CL'?'Laporan pendukung opsional. Laporan utama dan retase Clay tetap berjalan mandiri di Laporan Crusher.':'Atur kesiapan armada dan penugasan per shift untuk mendukung pencatatan retase Limestone.'}</p></div>{report&&<span className={`status-badge ${report.status==='SUBMITTED'?'success':report.status==='DRAFT'?'warning':'muted'}`}>{report.status} · V{report.version}</span>}</div>
 
     <div className="card vendor-context-grid">
       <label><span>Operation Date</span><input type="date" value={operationDate} onChange={e=>setOperationDate(e.target.value)}/></label>
       <label><span>Shift</span><select value={shiftCode} onChange={e=>setShiftCode(e.target.value as ShiftCode)}>{(lookups.data?.shifts??[]).map(s=><option key={s.code} value={s.code}>{s.label} · {s.startTime.slice(0,5)}–{s.endTime.slice(0,5)}</option>)}</select></label>
+      <label><span>Material report</span><input value={materialNames[materialKind]} readOnly /></label>
       <label><span>Vendor</span>{user?.role==='VENDOR'?<input readOnly value={vendors.find(v=>v.id===effectiveVendorId)?.label??user.displayName}/>:<select value={selectedVendorId} onChange={e=>setSelectedVendorId(e.target.value)}><option value="">— pilih vendor —</option>{vendors.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}</select>}</label>
       <label><span>Prepared By</span><input readOnly value={report?.createdByName??user?.displayName??''}/></label>
       <label><span>Status / Version</span><input readOnly value={report?`${report.status} · V${report.version}`:'NEW DRAFT'}/></label>
@@ -99,7 +104,7 @@ function VendorShiftReportPage(){
         const source=lookups.data?.sources.find(s=>s.id===a.sourceId);const crusher=lookups.data?.crushers.find(c=>c.id===a.crusherId);const crushers=(lookups.data?.crushers??[]).filter(c=>!source||c.materialKind===source.materialKind);const piles=(lookups.data?.piles??[]).filter(p=>(!crusher||p.materialKind===crusher.materialKind)&&(!crusher?.plantId||!p.plantId||p.plantId===crusher.plantId));const aaSearch=a.aaSearch.toLowerCase();const aaItems=(aaLookup.data?.items??[]).filter(x=>!aaSearch||`${x.unitNo} ${x.label}`.toLowerCase().includes(aaSearch));
         return <article key={a.key} className="assignment-card"><div className="assignment-head"><strong>Assignment #{index+1}</strong>{canWrite&&!readonly&&<button className="btn small" type="button" onClick={()=>removeAssignment(index)}>Remove</button>}</div>
           <div className="assignment-grid"><label><span>AM</span><select disabled={readonly||!canWrite} value={a.amId} onChange={e=>updateAssignment(index,{amId:e.target.value})}><option value="">— pilih AM —</option>{(amLookup.data?.items??[]).map(x=><option key={x.id} value={x.id}>{x.label}</option>)}</select></label>
-          <label><span>Source / Block</span><select disabled={readonly||!canWrite} value={a.sourceId} onChange={e=>{const src=lookups.data?.sources.find(s=>s.id===e.target.value);updateAssignment(index,{sourceId:e.target.value,blockSnapshot:src?.block??'',crusherId:'',pileId:''})}}><option value="">— pilih source —</option>{(lookups.data?.sources??[]).map(x=><option key={x.id} value={x.id}>{x.label} · {x.materialKind} · {x.materialCategory}</option>)}</select></label>
+          <label><span>Source / Block</span><select disabled={readonly||!canWrite} value={a.sourceId} onChange={e=>{const src=lookups.data?.sources.find(s=>s.id===e.target.value);updateAssignment(index,{sourceId:e.target.value,blockSnapshot:src?.block??'',crusherId:'',pileId:''})}}><option value="">— pilih source —</option>{(lookups.data?.sources??[]).filter(x=>x.materialKind===materialKind).map(x=><option key={x.id} value={x.id}>{x.label} · {x.materialKind} · {x.materialCategory}</option>)}</select></label>
           <label><span>Block Snapshot</span><input disabled={readonly||!canWrite} value={a.blockSnapshot} onChange={e=>updateAssignment(index,{blockSnapshot:e.target.value})}/></label>
           <label><span>Material</span><input readOnly value={source?`${source.materialKind} · ${source.materialCategory}`:''}/></label>
           <label><span>Crusher / Plant Destination</span><select disabled={readonly||!canWrite} value={a.crusherId} onChange={e=>updateAssignment(index,{crusherId:e.target.value,pileId:''})}><option value="">— pilih crusher —</option>{crushers.map(x=><option key={x.id} value={x.id}>{x.label}{x.plantId?` · ${lookups.data?.plants.find(p=>p.id===x.plantId)?.label??'Plant'}`:''}</option>)}</select></label>
@@ -112,7 +117,7 @@ function VendorShiftReportPage(){
     </div>
 
     {canManageOperational&&<div className="card assignment-section">
-      <div className="section-toolbar"><div><strong>Operational / Clay Assignment</strong><small>Aktif langsung di Retase Counter tanpa menunggu Shift Report. Source boleh kosong khusus Clay.</small></div><span className="status-badge warning">INDEPENDENT</span></div>
+      <div className="section-toolbar"><div><strong>Penugasan Operasional {materialNames[materialKind]}</strong><small>Penugasan langsung untuk material ini. Source opsional hanya untuk Clay.</small></div><span className="status-badge warning">INDEPENDENT</span></div>
       <div className="assignment-card"><div className="assignment-head"><strong>{operationalEditId?'Edit operational assignment':'Assign vendor, AM, AA & route'}</strong>{operationalEditId&&<button className="btn small" onClick={()=>{setOperational(newAssignment());setOperationalEditId(null)}}>Batal Edit</button>}</div>
         <div className="assignment-grid">
           <label><span>AM</span><select value={operational.amId} onChange={e=>setOperational(x=>({...x,amId:e.target.value}))}><option value="">— pilih AM —</option>{(amLookup.data?.items??[]).map(x=><option key={x.id} value={x.id}>{x.label}</option>)}</select></label>

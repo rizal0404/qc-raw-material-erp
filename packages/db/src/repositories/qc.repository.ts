@@ -1,13 +1,13 @@
 import { and, asc, count, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import type { Chemistry, MaterialKind } from '@qc/contracts';
+import type { Chemistry, MaterialKind, ClayRetaseUse } from '@qc/contracts';
 import { calculateQuality, chemistryEquals, LEGACY_BASELINE_QAF_RULES } from '@qc/domain';
 import type { MixView, QcRepository, RawSampleRecord, RawSampleWriteInput, SaveMixRepositoryInput, TonPerRetaseRule } from '@qc/domain';
 import type * as Schema from '../schema/index';
 import {
   auditLogs, mixItemChemistryRevisions, mixItems, mixes, piles, plants, qualityTargets, rawSamples, tonPerRetaseRules, users,
-  qcRetaseAllocations, qcRetaseAllocationEvents, mixItemRetaseAllocations, retaseEvents,
+  qcRetaseAllocations, qcRetaseAllocationEvents, mixItemRetaseAllocations, retaseEvents, mixItemClayRetaseSources,
 } from '../schema/index';
 
 const CHEM_KEYS = ['sio2','al2o3','fe2o3','cao','mgo','k2o','na2o','so3','h2o'] as const;
@@ -55,13 +55,19 @@ export function createQcRepository(db: PostgresJsDatabase<typeof Schema>): QcRep
       .where(eq(mixItems.mixId,mixId)).groupBy(mixItems.id,rawSamples.id).orderBy(asc(rawSamples.sampleId));
     const itemIds=rows.map((r)=>r.id);const allocationMap=new Map<string,{ids:string[];retase:number}>();
     if(itemIds.length){const links=await db.execute(sql`SELECT mix_item_id,allocation_id,retase_consumed FROM mix_item_retase_allocations WHERE active=true AND mix_item_id IN (${sql.join(itemIds.map(id=>sql`${id}::uuid`),sql`,`)}) ORDER BY created_at`);for(const x of links as unknown as Array<Record<string,unknown>>){const key=String(x.mix_item_id),v=allocationMap.get(key)??{ids:[],retase:0};v.ids.push(String(x.allocation_id));v.retase+=Number(x.retase_consumed??0);allocationMap.set(key,v);}}
+    const clayLinks=await db.select({mixItemId:mixItemClayRetaseSources.mixItemId,columnId:mixItemClayRetaseSources.columnId,retase:mixItemClayRetaseSources.retaseConsumed})
+      .from(mixItemClayRetaseSources).innerJoin(mixItems,eq(mixItems.id,mixItemClayRetaseSources.mixItemId)).where(eq(mixItems.mixId,mixId));
+    const clayMap=new Map<string,ClayRetaseUse[]>();
+    for(const link of clayLinks)clayMap.set(link.mixItemId,[...(clayMap.get(link.mixItemId)??[]),{columnId:link.columnId,retase:link.retase}]);
     return {
       ...m, defaultTonPerRetase: Number(m.defaultTonPerRetase),
-      items: rows.map((r)=>{ const chemistry=r.chemistry as Chemistry;const allocation=allocationMap.get(r.id)??{ids:[],retase:0}; return { id:r.id,rawSampleId:r.rawSampleId,sampleId:r.sampleId,noSample:r.noSample,typeGrade:r.typeGrade,vendorSnapshot:r.vendorSnapshot,sourceSnapshot:r.sourceSnapshot,retase:r.retase,tonPerRetase:Number(r.tonPerRetase),tonnage:Number(r.tonnage),chemistry,quality:calculateQuality(chemistry),note:r.note,hasChemistryRevision:Number(r.revisionCount)>0,retaseAllocationIds:allocation.ids,mappedRetaseConsumed:allocation.retase }; }),
+      items: rows.map((r)=>{ const chemistry=r.chemistry as Chemistry;const allocation=allocationMap.get(r.id)??{ids:[],retase:0}; return { id:r.id,rawSampleId:r.rawSampleId,sampleId:r.sampleId,noSample:r.noSample,typeGrade:r.typeGrade,vendorSnapshot:r.vendorSnapshot,sourceSnapshot:r.sourceSnapshot,retase:r.retase,tonPerRetase:Number(r.tonPerRetase),tonnage:Number(r.tonnage),chemistry,quality:calculateQuality(chemistry),note:r.note,hasChemistryRevision:Number(r.revisionCount)>0,retaseAllocationIds:allocation.ids,mappedRetaseConsumed:allocation.retase,clayRetaseSources:clayMap.get(r.id)??[] }; }),
     };
   }
 
   async function releaseRetaseConsumptionForMix(tx:any,mixId:string,reason:string,actorUserId:string){
+    await tx.execute(sql`UPDATE mix_item_clay_retase_sources c SET active=false,released_at=now(),released_reason=${reason}
+      FROM mix_items mi WHERE mi.id=c.mix_item_id AND mi.mix_id=${mixId}::uuid AND c.active`);
     const links=await tx.execute(sql`SELECT mira.allocation_id FROM mix_item_retase_allocations mira JOIN mix_items mi ON mi.id=mira.mix_item_id WHERE mi.mix_id=${mixId}::uuid AND mira.active=true FOR UPDATE`);
     const allocationIds=(links as unknown as Array<Record<string,unknown>>).map(r=>String(r.allocation_id));
     if(!allocationIds.length)return;
@@ -106,7 +112,13 @@ export function createQcRepository(db: PostgresJsDatabase<typeof Schema>): QcRep
       const tonnage = item.retase * item.tonPerRetase;
       const [createdItem] = await tx.insert(mixItems).values({ mixId:mix.id,sampleId:item.rawSampleId,retase:item.retase,tonPerRetase:String(item.tonPerRetase),tonnage:String(tonnage),chemistrySnapshot:item.chemistry,note:item.note }).returning({id:mixItems.id});
       if (!createdItem) throw new Error('Gagal membuat mix item.');
-      await consumeRetaseAllocationsForItem(tx,{mixId:mix.id,mixItemId:createdItem.id,sampleId:item.rawSampleId,retase:item.retase,allocationIds:item.retaseAllocationIds,overrideReason:item.retaseOverrideReason,actorUserId:input.createdBy});
+      if(input.materialKind==='CL'){
+        if(!item.clayRetaseSources.length||item.retaseAllocationIds.length||item.clayRetaseSources.reduce((sum,x)=>sum+x.retase,0)!==item.retase)throw new Error('Clay retase sources must equal mix item retase.');
+        await tx.insert(mixItemClayRetaseSources).values(item.clayRetaseSources.map(source=>({mixItemId:createdItem.id,columnId:source.columnId,retaseConsumed:source.retase})));
+      }else{
+        if(item.clayRetaseSources.length)throw new Error('Limestone cannot consume Clay retase.');
+        await consumeRetaseAllocationsForItem(tx,{mixId:mix.id,mixItemId:createdItem.id,sampleId:item.rawSampleId,retase:item.retase,allocationIds:item.retaseAllocationIds,overrideReason:item.retaseOverrideReason,actorUserId:input.createdBy});
+      }
       if (!chemistryEquals(rawChem,item.chemistry)) {
         if (!item.oxideChangeNote) throw new Error(`Note perubahan oksida wajib untuk ${raw.sampleId}.`);
         await tx.insert(mixItemChemistryRevisions).values({ mixItemId:createdItem.id,revisionNo:1,beforeSnapshot:rawChem,afterSnapshot:item.chemistry,reason:item.oxideChangeNote,changedBy:input.createdBy });
@@ -115,7 +127,28 @@ export function createQcRepository(db: PostgresJsDatabase<typeof Schema>): QcRep
     return mix.id;
   }
 
+  async function lockClayColumns(tx:any,input:SaveMixRepositoryInput,existingMixId?:string){
+    const ids=[...new Set(input.items.flatMap(item=>item.clayRetaseSources.map(source=>source.columnId)))];
+    if(!ids.length&&!existingMixId)return;
+    // Acquire the union before release/consume so competing replaces lock in the
+    // same order. The database triggers use these same column locks.
+    await tx.execute(sql`SELECT c.id FROM clay_report_columns c WHERE
+      ${ids.length?sql`c.id IN (${sql.join(ids.map(id=>sql`${id}::uuid`),sql`,`)})`:sql`false`}
+      ${existingMixId?sql`OR c.id IN (SELECT l.column_id FROM mix_item_clay_retase_sources l JOIN mix_items mi ON mi.id=l.mix_item_id WHERE mi.mix_id=${existingMixId}::uuid AND l.active)`:sql``}
+      ORDER BY c.id FOR UPDATE`);
+  }
+
   return {
+    async listClayWorkbenchSources(operationDate,shiftCode){
+      const rows=await db.execute(sql`SELECT c.id column_id,c.report_id,r.operation_date,r.shift_code,cr.name crusher_name,
+        r.status report_status,c.status column_status,c.header_primary,c.header_secondary,c.vendor_id,c.vendor_name_snapshot vendor_name,
+        c.source_id,c.source_name_snapshot source_name,b.total_retase,b.consumed_retase
+        FROM clay_shift_reports r JOIN clay_report_columns c ON c.report_id=r.id JOIN crushers cr ON cr.id=r.crusher_id
+        CROSS JOIN LATERAL clay_retase_balance(c.id) b
+        WHERE r.operation_date=${operationDate}::date AND r.shift_code=${shiftCode} AND r.status<>'SUPERSEDED'
+        ORDER BY cr.name,c.display_order,c.id`);
+      return (rows as unknown as Record<string,unknown>[]).map(r=>({columnId:String(r.column_id),reportId:String(r.report_id),operationDate:String(r.operation_date),shiftCode:String(r.shift_code),crusherName:String(r.crusher_name),reportStatus:String(r.report_status),columnStatus:String(r.column_status),headerPrimary:String(r.header_primary),headerSecondary:r.header_secondary==null?null:String(r.header_secondary),vendorId:r.vendor_id==null?null:String(r.vendor_id),vendorName:r.vendor_name==null?null:String(r.vendor_name),sourceId:r.source_id==null?null:String(r.source_id),sourceName:r.source_name==null?null:String(r.source_name),totalRetase:Number(r.total_retase),consumedRetase:Number(r.consumed_retase),availableRetase:Math.max(0,Number(r.total_retase)-Number(r.consumed_retase))}));
+    },
     async listRawSamples(filter) {
       const term=filter.search?.trim();
       const where=and(
@@ -177,11 +210,12 @@ export function createQcRepository(db: PostgresJsDatabase<typeof Schema>): QcRep
     },
     async getMixByCode(mixCode){ const [r]=await db.select({id:mixes.id}).from(mixes).where(and(sql`lower(${mixes.mixCode})=lower(${mixCode})`,eq(mixes.status,'ACTIVE'))).limit(1);return r?getMixInternal(r.id):null; },
     async hasConfirmedRetaseAllocation(sampleId,operationDate){const rows=await db.execute(sql`SELECT 1 FROM qc_retase_allocations WHERE sample_id=${sampleId}::uuid AND operation_date=${operationDate}::date AND mapping_status='CONFIRMED' AND review_required=false AND mix_id IS NULL AND approved_retase>0 LIMIT 1`);return (rows as unknown as Array<unknown>).length>0;},
-    async saveMix(input){ const mixId=await db.transaction(async(tx)=>insertMix(tx,input)); const mix=await getMixInternal(mixId);if(!mix)throw new Error('Mix gagal direload.');return mix; },
+    async saveMix(input){ const mixId=await db.transaction(async(tx)=>{await lockClayColumns(tx,input);return insertMix(tx,input);}); const mix=await getMixInternal(mixId);if(!mix)throw new Error('Mix gagal direload.');return mix; },
     async replaceMix(existingMixId,input,reason,actorUserId,actorRoleSnapshot,requestId){
       const mixId=await db.transaction(async(tx)=>{
         const locked=await tx.execute(sql`SELECT id,mix_code,status FROM mixes WHERE id=${existingMixId} FOR UPDATE`); const old=(locked as unknown as Array<Record<string,unknown>>)[0];
         if(!old||old.status!=='ACTIVE')throw new Error('Mix aktif yang akan diganti tidak ditemukan.');
+        await lockClayColumns(tx,input,existingMixId);
         await releaseRetaseConsumptionForMix(tx,existingMixId,reason,actorUserId);
         await tx.update(mixes).set({status:'REPLACED',updatedBy:actorUserId,updatedAt:new Date()}).where(eq(mixes.id,existingMixId));
         const id=await insertMix(tx,{...input,replacesMixId:existingMixId});

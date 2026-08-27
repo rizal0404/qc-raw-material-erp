@@ -89,6 +89,10 @@ export interface RetaseEventWriteRecord {
   assignmentId: string | null;
   assignmentAaId: string | null;
   assignmentOrigin: AssignmentOrigin | null;
+  clayReportId: string | null;
+  clayReportColumnId: string | null;
+  entrySource: 'LIVE_COUNTER' | 'QC_BACKFILL' | 'IMPORT';
+  entryBatchId: string | null;
   amId: string | null;
   aaId: string | null;
   sourceId: string | null;
@@ -97,6 +101,7 @@ export interface RetaseEventWriteRecord {
   materialKind: MaterialKind | null;
   materialCategory: string | null;
   vendorNameSnapshot: string | null;
+  sourceNameSnapshot: string | null;
   amUnitNoSnapshot: string | null;
   aaUnitNoSnapshot: string | null;
   delta: 1 | -1;
@@ -106,6 +111,11 @@ export interface RetaseEventWriteRecord {
   reversesEventId: string | null;
   reason: string | null;
   clientTs: Date | null;
+}
+
+export interface ClayCounterColumnRecord {
+  id:string;reportId:string;operationDate:string;shiftCode:ShiftCode;crusherId:string;reportStatus:'DRAFT'|'SUBMITTED'|'APPROVED'|'SUPERSEDED';columnStatus:'PROVISIONAL'|'CONFIRMED'|'INACTIVE';
+  vendorId:string|null;vendorName:string|null;sourceId:string|null;sourceName:string|null;pileId:string|null;headerPrimary:string;headerSecondary:string|null;
 }
 
 export interface RetaseEventRecord extends RetaseEventWriteRecord {

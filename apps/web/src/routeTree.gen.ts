@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedClayReportRouteImport } from './routes/_authenticated/clay-report'
 import { Route as AuthenticatedMasterDataRouteImport } from './routes/_authenticated/master-data'
 import { Route as AuthenticatedPetaMutuRouteImport } from './routes/_authenticated/peta-mutu'
 import { Route as AuthenticatedQcReportsRouteImport } from './routes/_authenticated/qc-reports'
@@ -35,6 +36,11 @@ const LoginRoute = LoginRouteImport.update({
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedClayReportRoute = AuthenticatedClayReportRouteImport.update({
+  id: '/clay-report',
+  path: '/clay-report',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedMasterDataRoute = AuthenticatedMasterDataRouteImport.update({
@@ -96,6 +102,7 @@ const AuthenticatedVendorShiftReportRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/login': typeof LoginRoute
+  '/clay-report': typeof AuthenticatedClayReportRoute
   '/master-data': typeof AuthenticatedMasterDataRoute
   '/peta-mutu': typeof AuthenticatedPetaMutuRoute
   '/qc-reports': typeof AuthenticatedQcReportsRoute
@@ -109,6 +116,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
+  '/clay-report': typeof AuthenticatedClayReportRoute
   '/master-data': typeof AuthenticatedMasterDataRoute
   '/peta-mutu': typeof AuthenticatedPetaMutuRoute
   '/qc-reports': typeof AuthenticatedQcReportsRoute
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/clay-report': typeof AuthenticatedClayReportRoute
   '/_authenticated/master-data': typeof AuthenticatedMasterDataRoute
   '/_authenticated/peta-mutu': typeof AuthenticatedPetaMutuRoute
   '/_authenticated/qc-reports': typeof AuthenticatedQcReportsRoute
@@ -142,6 +151,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/clay-report'
     | '/master-data'
     | '/peta-mutu'
     | '/qc-reports'
@@ -155,6 +165,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
+    | '/clay-report'
     | '/master-data'
     | '/peta-mutu'
     | '/qc-reports'
@@ -170,6 +181,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/clay-report'
     | '/_authenticated/master-data'
     | '/_authenticated/peta-mutu'
     | '/_authenticated/qc-reports'
@@ -209,6 +221,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/clay-report': {
+      id: '/_authenticated/clay-report'
+      path: '/clay-report'
+      fullPath: '/clay-report'
+      preLoaderRoute: typeof AuthenticatedClayReportRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/master-data': {
@@ -285,6 +304,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedClayReportRoute: typeof AuthenticatedClayReportRoute
   AuthenticatedMasterDataRoute: typeof AuthenticatedMasterDataRoute
   AuthenticatedPetaMutuRoute: typeof AuthenticatedPetaMutuRoute
   AuthenticatedQcReportsRoute: typeof AuthenticatedQcReportsRoute
@@ -299,6 +319,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedClayReportRoute: AuthenticatedClayReportRoute,
   AuthenticatedMasterDataRoute: AuthenticatedMasterDataRoute,
   AuthenticatedPetaMutuRoute: AuthenticatedPetaMutuRoute,
   AuthenticatedQcReportsRoute: AuthenticatedQcReportsRoute,

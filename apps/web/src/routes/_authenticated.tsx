@@ -1,11 +1,15 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { createFileRoute, Link, Outlet, redirect, useRouter } from '@tanstack/react-router';
-import type { Role } from '@qc/contracts';
+import { createFileRoute, Link, Outlet, redirect, useLocation, useRouter } from '@tanstack/react-router';
+import { AppSidebar } from '../components/app-sidebar';
+import { AppIcon } from '../components/app-icon';
+import { MaterialBadge, MaterialContext } from '../features/navigation/material-context';
+import { isMaterialPage, materialForPath, materialNames, pageLabel, validateMaterialSearch } from '../features/navigation/workflow';
 import { authQueryKey, authQueryOptions } from '../features/auth/auth-query';
 import { apiFetch } from '../lib/api-client';
 
 export const Route = createFileRoute('/_authenticated')({
+  validateSearch: validateMaterialSearch,
   beforeLoad: async ({ context }) => {
     const auth = await context.queryClient.ensureQueryData(authQueryOptions);
     if (!auth.authenticated) throw redirect({ to: '/login' });
@@ -13,27 +17,29 @@ export const Route = createFileRoute('/_authenticated')({
   component: AuthenticatedLayout,
 });
 
-const roleLabels: Record<Role, string> = {
-  VENDOR: 'Vendor',
-  CRUSHER_OPERATOR: 'Crusher Operator',
-  QC_ANALYST: 'QC Analyst',
-  SUPERVISOR_ADMIN: 'Supervisor / Admin',
-};
-
-function roleModules(role: Role): string[] {
-  if (role === 'VENDOR') return ['Shift Report', 'History'];
-  if (role === 'CRUSHER_OPERATOR') return ['Retase Counter', 'Shift Summary'];
-  if (role === 'QC_ANALYST') return ['QC Workbench', 'Reconciliation', 'Reporting'];
-  return ['Operations', 'Reconciliation', 'Reporting', 'Master Data', 'User Management'];
-}
-
 function AuthenticatedLayout() {
   const { data } = useQuery(authQueryOptions);
   const router = useRouter();
+  const { pathname, href } = useLocation();
+  const search = Route.useSearch();
+  const material = materialForPath(pathname, search.material);
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem('qc.sidebar.collapsed') === 'true'; } catch { return false; } });
+  const [mobile, setMobile] = useState(() => window.matchMedia('(max-width: 900px)').matches);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const closeMenu = useCallback(() => setMobileOpen(false), []);
+  useEffect(() => { setMobileOpen(false); }, [href]);
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 900px)');
+    const update = () => { setMobile(media.matches); setMobileOpen(false); };
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  useEffect(() => { try { localStorage.setItem('qc.sidebar.collapsed', String(collapsed)); } catch { /* Preference storage is optional. */ } }, [collapsed]);
+  useEffect(() => { document.title = `${pageLabel(pathname)}${isMaterialPage(pathname) ? ` · ${materialNames[material]}` : ''} | QC Raw Material`; }, [pathname, material]);
   const logout = useMutation({
     mutationFn: () => apiFetch<{ ok: true }>('/auth/logout', { method: 'POST' }),
     onSuccess: async () => {
-      router.options.context.queryClient.removeQueries({ queryKey: authQueryKey });
+      router.options.context.queryClient.clear();
       await router.navigate({ to: '/login' });
     },
   });
@@ -49,24 +55,23 @@ function AuthenticatedLayout() {
   }, [router]);
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div className="brand-block">
-          <div className="brand-mark">QC</div>
-          <div><strong>QC Raw Material</strong><small>Native Web</small></div>
+    <MaterialContext.Provider value={material}>
+      <div className={`app-shell workspace-shell ${collapsed ? 'sidebar-is-collapsed' : ''} material-${isMaterialPage(pathname) ? material.toLowerCase() : 'ls'}`}>
+        <a className="skip-link" href="#main-content">Langsung ke konten</a>
+        {user && <AppSidebar user={user} pathname={pathname} material={material} collapsed={collapsed} mobile={mobile} mobileOpen={mobileOpen} onCollapse={() => setCollapsed(value => !value)} onClose={closeMenu} onLogout={() => logout.mutate()} loggingOut={logout.isPending} />}
+        <div className="workspace-body" inert={mobile && mobileOpen}>
+          <header className="workspace-topbar">
+            <button className="mobile-menu-button" type="button" aria-label="Buka menu" aria-expanded={mobileOpen} aria-controls="app-sidebar" onClick={() => setMobileOpen(true)}><AppIcon name="menu" /></button>
+            <nav className="breadcrumbs" aria-label="Breadcrumb"><Link to="/" search={{}}>Workspace</Link><AppIcon name="chevron" size={12} />{isMaterialPage(pathname) && <><span>{materialNames[material]}</span><AppIcon name="chevron" size={12} /></>}<strong>{pageLabel(pathname)}</strong></nav>
+            <div className="topbar-context">{isMaterialPage(pathname) && <MaterialBadge />}<span className="timezone-label">WITA <span>UTC+8</span></span></div>
+          </header>
+          <main id="main-content" className="workspace-main" tabIndex={-1}>
+            {logout.isError && <div className="alert error" role="alert">Gagal keluar. Silakan coba kembali.</div>}
+            <Outlet key={material} />
+          </main>
+          <footer className="workspace-footer"><span>QC Raw Material <i /> Semen Tonasa</span><span>Quality in every layer.</span></footer>
         </div>
-        <nav className="main-nav"><Link to="/">Home</Link>{(user?.role === 'VENDOR' || user?.role === 'QC_ANALYST' || user?.role === 'SUPERVISOR_ADMIN') && <Link to="/vendor-shift-report">Shift Report</Link>}{(user?.role === 'CRUSHER_OPERATOR' || user?.role === 'SUPERVISOR_ADMIN') && <Link to="/retase-counter">Retase Counter</Link>}{(user?.role === 'QC_ANALYST' || user?.role === 'SUPERVISOR_ADMIN') && <><Link to="/raw-samples">Samples</Link><Link to="/reconciliation">Reconciliation</Link><Link to="/qc-workbench">Workbench</Link><Link to="/qc-reports">QC Reports</Link><Link to="/peta-mutu">Peta Mutu</Link></>}<Link to="/security">Security</Link>{user?.role === 'SUPERVISOR_ADMIN' && <><Link to="/master-data">Master Data</Link><Link to="/user-management">Users</Link></>}</nav>
-        <div className="session-block">
-          {user && <div className="user-chip"><span>{user.displayName}</span><small>{roleLabels[user.role]}</small></div>}
-          <button className="btn ghost" type="button" disabled={logout.isPending} onClick={() => logout.mutate()}>{logout.isPending ? 'Keluar...' : 'Logout'}</button>
-        </div>
-      </header>
-      {user && (
-        <div className="module-strip">
-          {roleModules(user.role).map((module) => <span key={module}>{module}</span>)}
-        </div>
-      )}
-      <main><Outlet /></main>
-    </div>
+      </div>
+    </MaterialContext.Provider>
   );
 }

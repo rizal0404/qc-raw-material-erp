@@ -100,6 +100,21 @@ Assignment contains `activeNow` based on current server local time and assignmen
 
 `reason` is mandatory for Unlisted AA.
 
+### Direct Clay column request
+
+```json
+{
+  "requestId": "uuid",
+  "operationDate": "2026-08-26",
+  "shiftCode": "SHIFT_2",
+  "crusherId": "uuid",
+  "clayReportColumnId": "uuid",
+  "clientTs": "2026-08-26T08:15:00.000Z"
+}
+```
+
+Backend resolves Vendor/Source/Pile snapshots from the active `DRAFT` Clay report column. Vendor Shift Report, AM, AA, unlisted unit, and reason are not required for this shape.
+
 Response:
 
 ```json

@@ -1,4 +1,4 @@
-import type { Chemistry, MaterialKind } from '@qc/contracts';
+import type { Chemistry, MaterialKind, ClayRetaseUse, ClayWorkbenchSource } from '@qc/contracts';
 import type { AuditWriteInput } from '../master/types';
 import type { MixSummaryRecord, MixView, RawSampleRecord } from './types';
 import type { TonPerRetaseRule } from './ton-per-retase';
@@ -10,9 +10,10 @@ export interface MixListFilter { materialKind?: MaterialKind | undefined; operat
 export interface SaveMixRepositoryInput {
   mixCode: string; materialKind: MaterialKind; operationDate: string; pileId: string; shiftCode: string; batchNo: number | null; tiangKe: string | null; pileCycle: number;
   defaultTonPerRetase: number; note: string | null; createdBy: string; replacesMixId?: string | null;
-  items: Array<{ rawSampleId: string; retase: number; tonPerRetase: number; chemistry: Chemistry; note: string | null; oxideChangeNote: string | null; retaseAllocationIds: string[]; retaseOverrideReason: string | null }>;
+  items: Array<{ rawSampleId: string; retase: number; tonPerRetase: number; chemistry: Chemistry; note: string | null; oxideChangeNote: string | null; retaseAllocationIds: string[]; clayRetaseSources: ClayRetaseUse[]; retaseOverrideReason: string | null }>;
 }
 export interface QcRepository {
+  listClayWorkbenchSources(operationDate: string, shiftCode: string): Promise<ClayWorkbenchSource[]>;
   listRawSamples(filter: RawSampleFilter): Promise<{ items: RawSampleRecord[]; total: number }>;
   findRawSampleById(id: string): Promise<RawSampleRecord | null>;
   findRawSampleBySampleId(sampleId: string): Promise<RawSampleRecord | null>;

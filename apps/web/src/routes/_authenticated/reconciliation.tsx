@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Navigate } from '@tanstack/react-router';
 import type {
   MappingStatus,
   MaterialKind,
@@ -9,7 +9,8 @@ import type {
   ReconciliationException,
   ShiftCode,
 } from '@qc/contracts';
-import { masterLookups } from '../../features/qc/qc-api';
+import { useMaterial, useMaterialLookups } from '../../features/navigation/material-context';
+import { materialNames } from '../../features/navigation/workflow';
 import {
   confirmRetaseAllocation,
   createRetaseAllocation,
@@ -37,13 +38,18 @@ function badgeClass(status: MappingStatus) {
 }
 
 function ReconciliationPage() {
+  const kind=useMaterial();
+  return kind==='CL'?<Navigate to="/qc-workbench" search={{material:'CL'}} replace />:<LimestoneReconciliationPage />;
+}
+
+function LimestoneReconciliationPage() {
   const queryClient = useQueryClient();
-  const lookups = useQuery({ queryKey: ['lookups', 'master'], queryFn: masterLookups, staleTime: 5 * 60_000 });
+  const lookups = useMaterialLookups();
   const [date, setDate] = useState(today());
   const [shift, setShift] = useState('');
   const [crusher, setCrusher] = useState('');
   const [vendor, setVendor] = useState('');
-  const [kind, setKind] = useState('');
+  const kind = useMaterial();
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<ReconciliationAssignment | null>(null);
@@ -191,17 +197,17 @@ function ReconciliationPage() {
     <section className="page-stack reconciliation-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">SLICE 06 / QC CONTROL</p>
-          <h1>QC Reconciliation + Retase Mapping</h1>
-          <p>Observed crusher event → assignment → Vendor-based Sample_ID candidate → QC confirmation → Workbench suggestion → Mix consumption.</p>
+          <p className="eyebrow">{materialNames[kind]} / KONTROL MUTU</p>
+          <h1>Rekonsiliasi Retase</h1>
+          <p>Cocokkan perjalanan armada dengan sampel laboratorium sebelum digunakan dalam mixing.</p>
         </div>
-        <span className="status-badge success">SERVER CONTROLLED</span>
+        <span className="status-badge success">KONFIRMASI QC</span>
       </div>
 
       <div className="card reconciliation-filters">
         <label><span>Operation Date</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
         <label><span>Shift</span><select value={shift} onChange={(event) => setShift(event.target.value)}><option value="">ALL</option>{(lookups.data?.shifts ?? []).map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
-        <label><span>Material</span><select value={kind} onChange={(event) => { setKind(event.target.value); setCrusher(''); }}><option value="">ALL</option><option value="LS">Limestone</option><option value="CL">Clay</option></select></label>
+        <label><span>Material</span><input value={materialNames[kind]} readOnly /></label>
         <label><span>Crusher</span><select value={crusher} onChange={(event) => setCrusher(event.target.value)}><option value="">ALL</option>{filteredCrushers.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
         <label><span>Vendor</span><select value={vendor} onChange={(event) => setVendor(event.target.value)}><option value="">ALL</option>{(lookups.data?.vendors ?? []).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
         <label><span>Status</span><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="">ALL</option>{statuses.map((item) => <option key={item}>{item}</option>)}</select></label>

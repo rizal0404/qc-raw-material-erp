@@ -9,7 +9,7 @@ export interface RawSampleView extends RawSampleRecord { quality: Quality; }
 export interface MixItemView {
   id: string; rawSampleId: string; sampleId: string; noSample: string | null; typeGrade: string | null; vendorSnapshot: string | null; sourceSnapshot: string | null;
   retase: number; tonPerRetase: number; tonnage: number; chemistry: Chemistry; quality: Quality; note: string | null; hasChemistryRevision: boolean;
-  retaseAllocationIds: string[]; mappedRetaseConsumed: number;
+  retaseAllocationIds: string[]; mappedRetaseConsumed: number; clayRetaseSources: import('@qc/contracts').ClayRetaseUse[];
 }
 export interface MixView {
   id: string; mixCode: string; materialKind: MaterialKind; operationDate: string; pileId: string; pileCode: string; pileName: string;

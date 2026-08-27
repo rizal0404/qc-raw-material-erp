@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import {
   CreateCrusherRequestSchema, CreateEquipmentRequestSchema, CreatePileRequestSchema, CreatePlantRequestSchema, CreateSourceRequestSchema, CreateVendorRequestSchema,
-  CrusherListQuerySchema, EquipmentListQuerySchema, EquipmentTypeSchema, PileListQuerySchema, PlantListQuerySchema, SourceListQuerySchema,
+  CrusherListQuerySchema, EquipmentListQuerySchema, EquipmentTypeSchema, MaterialKindSchema, PileListQuerySchema, PlantListQuerySchema, SourceListQuerySchema,
   UpdateCrusherRequestSchema, UpdateEquipmentRequestSchema, UpdatePileRequestSchema, UpdatePlantRequestSchema, UpdateSourceRequestSchema, UpdateVendorRequestSchema,
   VendorListQuerySchema,
 } from '@qc/contracts';
@@ -28,7 +28,7 @@ export async function registerMasterRoutes(app: FastifyInstance, service: Master
 
   app.get('/vendors', adminOnly, async (request) => {
     const q = VendorListQuerySchema.parse(request.query);
-    const result = await service.listVendors(listFilter(service, q));
+    const result = await service.listVendors({ ...listFilter(service, q), ...(q.materialKind ? { materialKind: q.materialKind } : {}) });
     return { ok: true as const, ...result };
   });
   app.post('/vendors', adminOnly, async (request) => {
@@ -42,7 +42,7 @@ export async function registerMasterRoutes(app: FastifyInstance, service: Master
 
   app.get('/plants', adminOnly, async (request) => {
     const q = PlantListQuerySchema.parse(request.query);
-    const result = await service.listPlants(listFilter(service, q));
+    const result = await service.listPlants({ ...listFilter(service, q), ...(q.materialKind ? { materialKind: q.materialKind } : {}) });
     return { ok: true as const, ...result };
   });
   app.post('/plants', adminOnly, async (request) => {
@@ -70,7 +70,7 @@ export async function registerMasterRoutes(app: FastifyInstance, service: Master
 
   app.get('/equipment', adminOnly, async (request) => {
     const q = EquipmentListQuerySchema.parse(request.query);
-    const result = await service.listEquipment({ ...listFilter(service, q), ...(q.vendorId ? { vendorId: q.vendorId } : {}), ...(q.type ? { type: q.type } : {}) });
+    const result = await service.listEquipment({ ...listFilter(service, q), ...(q.vendorId ? { vendorId: q.vendorId } : {}), ...(q.type ? { type: q.type } : {}), ...(q.materialKind ? { materialKind: q.materialKind } : {}) });
     return { ok: true as const, ...result };
   });
   app.post('/equipment', adminOnly, async (request) => {
@@ -111,14 +111,17 @@ export async function registerMasterRoutes(app: FastifyInstance, service: Master
   });
 
   app.get('/lookups/master', { preHandler: app.auth.requireAuth }, async (request) => {
-    const data = await service.getLookupBootstrap(request.principal!);
+    const raw = request.query as { materialKind?: string };
+    const materialKind = raw.materialKind ? MaterialKindSchema.parse(raw.materialKind) : undefined;
+    const data = await service.getLookupBootstrap(request.principal!, materialKind);
     return { ok: true as const, ...data };
   });
   app.get('/lookups/equipment', { preHandler: app.auth.requireAuth }, async (request) => {
-    const raw = request.query as { vendorId?: string; type?: string };
+    const raw = request.query as { vendorId?: string; type?: string; materialKind?: string };
     const typeParsed = raw.type ? EquipmentTypeSchema.safeParse(raw.type) : null;
     if (raw.type && !typeParsed?.success) throw new AppError(400, 'VALIDATION_ERROR', 'Equipment type tidak valid.');
-    const items = await service.getEquipmentLookup(request.principal!, raw.vendorId, typeParsed?.success ? typeParsed.data : undefined);
+    const materialKind = raw.materialKind ? MaterialKindSchema.parse(raw.materialKind) : undefined;
+    const items = await service.getEquipmentLookup(request.principal!, raw.vendorId, typeParsed?.success ? typeParsed.data : undefined, materialKind);
     return { ok: true as const, items };
   });
 }

@@ -49,10 +49,22 @@ export const WorkbenchSamplesQuerySchema = z.object({
   materialKind: MaterialKindSchema, operationDate: IsoDateSchema,
 });
 
+export const ClayWorkbenchQuerySchema = z.object({ operationDate: IsoDateSchema, shiftCode: z.enum(['SHIFT_1','SHIFT_2','SHIFT_3']) });
+export const ClayRetaseUseSchema = z.object({ columnId: z.string().uuid(), retase: z.number().int().positive() });
+export type ClayRetaseUse = z.infer<typeof ClayRetaseUseSchema>;
+export interface ClayWorkbenchSource {
+  columnId: string; reportId: string; operationDate: string; shiftCode: string;
+  crusherName: string; reportStatus: string; columnStatus: string;
+  headerPrimary: string; headerSecondary: string | null;
+  vendorId: string | null; vendorName: string | null; sourceId: string | null; sourceName: string | null;
+  totalRetase: number; consumedRetase: number; availableRetase: number;
+}
+
 export const MixItemInputSchema = z.object({
   rawSampleId: z.string().uuid(), retase: z.number().int().positive(), tonPerRetase: z.number().finite().positive(),
   note: z.string().trim().max(1000).nullable().optional(), chemistry: ChemistrySchema.optional(), oxideChangeNote: z.string().trim().min(3).max(1000).nullable().optional(),
   retaseAllocationIds: z.array(z.string().uuid()).max(100).default([]),
+  clayRetaseSources: z.array(ClayRetaseUseSchema).max(100).default([]),
   retaseOverrideReason: z.string().trim().min(3).max(1000).nullable().optional(),
 });
 export const SaveMixRequestSchema = z.object({

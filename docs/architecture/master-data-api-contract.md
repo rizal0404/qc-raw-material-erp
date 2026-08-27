@@ -9,6 +9,7 @@ All endpoints require an authenticated session. CRUD/list administration endpoin
 ```text
 search=<text>
 active=all|true|false
+materialKind=LS|CL
 limit=1..250
  offset>=0
 ```
@@ -38,6 +39,7 @@ Create example:
   "code": "TOPABIRING",
   "name": "PT Topabiring Trans Logistic",
   "aliases": ["PT. TOPABIRING TRANS LOGISTIC"],
+  "materialKinds": ["LS", "CL"],
   "contactEmail": null
 }
 ```
@@ -61,7 +63,8 @@ Create:
   "unitNo": "112",
   "brand": "Komatsu",
   "model": null,
-  "aliases": []
+  "aliases": [],
+  "materialKinds": ["CL"]
 }
 ```
 
@@ -113,7 +116,7 @@ Create:
 ## Plants
 
 ```http
-GET    /plants
+GET    /plants?materialKind=CL
 POST   /plants
 PATCH  /plants/:id
 ```
@@ -131,7 +134,7 @@ PATCH  /piles/:id
 ### Bootstrap
 
 ```http
-GET /lookups/master
+GET /lookups/master?materialKind=CL
 ```
 
 Response shape:
@@ -152,7 +155,7 @@ Response shape:
 ### Equipment
 
 ```http
-GET /lookups/equipment?vendorId=<uuid>&type=AM
+GET /lookups/equipment?vendorId=<uuid>&type=AM&materialKind=CL
 ```
 
 This endpoint is intentionally separate because equipment can grow much larger than the static master bootstrap.
@@ -166,6 +169,7 @@ MASTER_CODE_EXISTS
 VENDOR_ALIAS_EXISTS
 EQUIPMENT_EXISTS
 REASON_REQUIRED
+MATERIAL_SCOPE_MISMATCH
 FORBIDDEN
 AUTH_REQUIRED
 AUTH_EXPIRED

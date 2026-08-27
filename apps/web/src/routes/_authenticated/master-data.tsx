@@ -37,32 +37,33 @@ function aliasesFromText(value: string) { return value.split(',').map((x) => x.t
 function nullable(value: string) { const v = value.trim(); return v ? v : null; }
 
 function defaultForm(tab: Tab, lookups?: MasterLookupResponse): FormState {
-  if (tab === 'equipment') return { vendorId: lookups?.vendors[0]?.id ?? '', type: 'AA', unitNo: '', brand: '', model: '', aliases: '', active: true, reason: '' };
+  if (tab === 'equipment') return { vendorId: lookups?.vendors[0]?.id ?? '', type: 'AA', unitNo: '', brand: '', model: '', aliases: '', scopeLS: true, scopeCL: true, active: true, reason: '' };
   if (tab === 'crushers') return { code: '', name: '', materialKind: 'LS', plantId: '', active: true, reason: '' };
   if (tab === 'sources') return { code: '', name: '', block: '', materialCategory: 'PILE', materialKind: 'LS', aliases: '', active: true, reason: '' };
   if (tab === 'piles') return { code: '', name: '', materialKind: 'LS', plantId: '', className: '', active: true, reason: '' };
-  if (tab === 'vendors') return { code: '', name: '', contactEmail: '', aliases: '', active: true, reason: '' };
-  return { code: '', name: '', active: true, reason: '' };
+  if (tab === 'vendors') return { code: '', name: '', contactEmail: '', aliases: '', scopeLS: true, scopeCL: true, active: true, reason: '' };
+  return { code: '', name: '', scopeLS: true, scopeCL: true, active: true, reason: '' };
 }
 
 function formFromItem(tab: Tab, item: RowItem): FormState {
-  if (tab === 'vendors') { const x = item as Vendor; return { code: x.code, name: x.name, contactEmail: x.contactEmail ?? '', aliases: aliasesToText(x.aliases), active: x.active, reason: '' }; }
-  if (tab === 'equipment') { const x = item as Equipment; return { vendorId: x.vendorId, type: x.type, unitNo: x.unitNo, brand: x.brand ?? '', model: x.model ?? '', aliases: aliasesToText(x.aliases), active: x.active, reason: '' }; }
+  if (tab === 'vendors') { const x = item as Vendor; return { code: x.code, name: x.name, contactEmail: x.contactEmail ?? '', aliases: aliasesToText(x.aliases), scopeLS:x.materialKinds.includes('LS'),scopeCL:x.materialKinds.includes('CL'), active: x.active, reason: '' }; }
+  if (tab === 'equipment') { const x = item as Equipment; return { vendorId: x.vendorId, type: x.type, unitNo: x.unitNo, brand: x.brand ?? '', model: x.model ?? '', aliases: aliasesToText(x.aliases), scopeLS:x.materialKinds.includes('LS'),scopeCL:x.materialKinds.includes('CL'), active: x.active, reason: '' }; }
   if (tab === 'crushers') { const x = item as Crusher; return { code: x.code, name: x.name, materialKind: x.materialKind, plantId: x.plantId ?? '', active: x.active, reason: '' }; }
   if (tab === 'sources') { const x = item as Source; return { code: x.code, name: x.name, block: x.block ?? '', materialCategory: x.materialCategory, materialKind: x.materialKind, aliases: aliasesToText(x.aliases), active: x.active, reason: '' }; }
   if (tab === 'piles') { const x = item as Pile; return { code: x.code, name: x.name, materialKind: x.materialKind, plantId: x.plantId ?? '', className: x.className ?? '', active: x.active, reason: '' }; }
-  const x = item as Plant; return { code: x.code, name: x.name, active: x.active, reason: '' };
+  const x = item as Plant; return { code: x.code, name: x.name, scopeLS:x.materialKinds.includes('LS'),scopeCL:x.materialKinds.includes('CL'), active: x.active, reason: '' };
 }
 
 function payloadFromForm(tab: Tab, form: FormState, editing: boolean) {
   const reason = String(form.reason ?? '').trim();
   const common = editing ? { active: Boolean(form.active), ...(reason ? { reason } : {}) } : {};
-  if (tab === 'vendors') return { code: String(form.code), name: String(form.name), aliases: aliasesFromText(String(form.aliases)), contactEmail: nullable(String(form.contactEmail)), ...common };
-  if (tab === 'equipment') return { vendorId: String(form.vendorId), type: String(form.type), unitNo: String(form.unitNo), brand: nullable(String(form.brand)), model: nullable(String(form.model)), aliases: aliasesFromText(String(form.aliases)), ...common };
+  const materialKinds=[...(form.scopeLS?['LS']:[]),...(form.scopeCL?['CL']:[])];
+  if (tab === 'vendors') return { code: String(form.code), name: String(form.name), aliases: aliasesFromText(String(form.aliases)), contactEmail: nullable(String(form.contactEmail)), materialKinds, ...common };
+  if (tab === 'equipment') return { vendorId: String(form.vendorId), type: String(form.type), unitNo: String(form.unitNo), brand: nullable(String(form.brand)), model: nullable(String(form.model)), aliases: aliasesFromText(String(form.aliases)), materialKinds, ...common };
   if (tab === 'crushers') return { code: String(form.code), name: String(form.name), materialKind: String(form.materialKind), plantId: nullable(String(form.plantId)), ...common };
   if (tab === 'sources') return { code: String(form.code), name: String(form.name), block: nullable(String(form.block)), materialCategory: String(form.materialCategory), materialKind: String(form.materialKind), aliases: aliasesFromText(String(form.aliases)), ...common };
   if (tab === 'piles') return { code: String(form.code), name: String(form.name), materialKind: String(form.materialKind), plantId: nullable(String(form.plantId)), className: nullable(String(form.className)), ...common };
-  return { code: String(form.code), name: String(form.name), ...common };
+  return { code: String(form.code), name: String(form.name), materialKinds, ...common };
 }
 
 function MasterDataPage() {
@@ -81,7 +82,7 @@ function MasterDataPage() {
     const p = new URLSearchParams({ active, limit: '250', offset: '0' });
     if (search.trim()) p.set('search', search.trim());
     if (tab === 'equipment' && vendorFilter) p.set('vendorId', vendorFilter);
-    if ((tab === 'crushers' || tab === 'sources' || tab === 'piles') && kindFilter) p.set('materialKind', kindFilter);
+    if ((tab === 'vendors'||tab==='equipment'||tab==='plants'||tab === 'crushers' || tab === 'sources' || tab === 'piles') && kindFilter) p.set('materialKind', kindFilter);
     return p;
   }, [active, kindFilter, search, tab, vendorFilter]);
   const filterKey = params.toString();
@@ -100,6 +101,8 @@ function MasterDataPage() {
       setModal(null); setMessage('Master data berhasil disimpan.');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: masterKeys.all }),
+        queryClient.invalidateQueries({ queryKey: ['lookups', 'master'] }),
+        queryClient.invalidateQueries({ queryKey: ['equipment-lookup'] }),
         queryClient.invalidateQueries({ queryKey: masterKeys.lookups }),
       ]);
     },
@@ -113,12 +116,12 @@ function MasterDataPage() {
     const action: ColumnDef<RowItem> = { header: 'Aksi', cell: ({ row }) => <button className="btn small" type="button" onClick={() => openEdit(row.original)}>Edit</button> };
     if (tab === 'vendors') return [
       { header: 'Code', cell: ({ row }) => (row.original as Vendor).code }, { header: 'Vendor', cell: ({ row }) => <strong>{(row.original as Vendor).name}</strong> },
-      { header: 'Alias', cell: ({ row }) => aliasesToText((row.original as Vendor).aliases) || '—' }, { header: 'Email', cell: ({ row }) => (row.original as Vendor).contactEmail ?? '—' },
+      { header: 'Alias', cell: ({ row }) => aliasesToText((row.original as Vendor).aliases) || '—' }, {header:'Material',cell:({row})=>(row.original as Vendor).materialKinds.join(' + ')}, { header: 'Email', cell: ({ row }) => (row.original as Vendor).contactEmail ?? '—' },
       { header: 'Status', cell: ({ row }) => activeLabel((row.original as Vendor).active) }, action,
     ];
     if (tab === 'equipment') return [
       { header: 'Vendor', cell: ({ row }) => (row.original as Equipment).vendorName }, { header: 'Type', cell: ({ row }) => <span className="code-chip">{(row.original as Equipment).type}</span> },
-      { header: 'Unit', cell: ({ row }) => <strong>{(row.original as Equipment).unitNo}</strong> }, { header: 'Brand / Model', cell: ({ row }) => `${(row.original as Equipment).brand ?? '—'} / ${(row.original as Equipment).model ?? '—'}` },
+      { header: 'Unit', cell: ({ row }) => <strong>{(row.original as Equipment).unitNo}</strong> }, {header:'Material',cell:({row})=>(row.original as Equipment).materialKinds.join(' + ')}, { header: 'Brand / Model', cell: ({ row }) => `${(row.original as Equipment).brand ?? '—'} / ${(row.original as Equipment).model ?? '—'}` },
       { header: 'Status', cell: ({ row }) => activeLabel((row.original as Equipment).active) }, action,
     ];
     if (tab === 'crushers') return [
@@ -137,7 +140,7 @@ function MasterDataPage() {
       { header: 'Class', cell: ({ row }) => (row.original as Pile).className ?? '—' }, { header: 'Status', cell: ({ row }) => activeLabel((row.original as Pile).active) }, action,
     ];
     return [
-      { header: 'Code', cell: ({ row }) => (row.original as Plant).code }, { header: 'Plant', cell: ({ row }) => <strong>{(row.original as Plant).name}</strong> },
+      { header: 'Code', cell: ({ row }) => (row.original as Plant).code }, { header: 'Plant', cell: ({ row }) => <strong>{(row.original as Plant).name}</strong> }, {header:'Material',cell:({row})=>(row.original as Plant).materialKinds.join(' + ')},
       { header: 'Status', cell: ({ row }) => activeLabel((row.original as Plant).active) }, action,
     ];
   }, [tab]);
@@ -145,13 +148,13 @@ function MasterDataPage() {
   const currentTab = tabs.find((x) => x.id === tab)!;
   return (
     <section className="page-stack">
-      <div className="page-heading"><div><p className="eyebrow">ADMINISTRATION / MASTER DATA</p><h1>Master Data</h1><p>Canonical data untuk Vendor Shift Report, Counter, Reconciliation, QC Workbench, dan IAM scopes.</p></div><button className="btn primary" type="button" onClick={openCreate}>+ Tambah {currentTab.label}</button></div>
+      <div className="page-heading"><div><p className="eyebrow">ADMINISTRATION / MASTER DATA</p><h1>Master Data</h1><p>Kelola vendor, alat, sumber, dan tujuan produksi. Atur cakupan Limestone dan Clay pada setiap master.</p></div><button className="btn primary" type="button" onClick={openCreate}>+ Tambah {currentTab.label}</button></div>
       <div className="master-tabs">{tabs.map((x) => <button key={x.id} className={tab === x.id ? 'active' : ''} type="button" onClick={() => { setTab(x.id); setSearch(''); setVendorFilter(''); setKindFilter(''); }}>{x.label}<small>{x.hint}</small></button>)}</div>
       <div className="card toolbar-card">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Cari ${currentTab.label.toLowerCase()}...`} />
-        <select value={active} onChange={(e) => setActive(e.target.value as 'all' | 'true' | 'false')}><option value="all">Semua Status</option><option value="true">Active</option><option value="false">Inactive</option></select>
+        <input aria-label="Cari master data" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Cari ${currentTab.label.toLowerCase()}...`} />
+        <select aria-label="Status master" value={active} onChange={(e) => setActive(e.target.value as 'all' | 'true' | 'false')}><option value="all">Semua Status</option><option value="true">Active</option><option value="false">Inactive</option></select>
         {tab === 'equipment' && <select value={vendorFilter} onChange={(e) => setVendorFilter(e.target.value)}><option value="">Semua Vendor</option>{lookups?.vendors.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</select>}
-        {(tab === 'crushers' || tab === 'sources' || tab === 'piles') && <select value={kindFilter} onChange={(e) => setKindFilter(e.target.value)}><option value="">LS + CL</option><option value="LS">Limestone</option><option value="CL">Clay</option></select>}
+        <select aria-label="Material master" value={kindFilter} onChange={(e) => setKindFilter(e.target.value)}><option value="">Semua material</option><option value="LS">Limestone</option><option value="CL">Clay</option></select>
         <span className="toolbar-meta">{listQuery.isFetching ? 'Memuat…' : `${listQuery.data?.total ?? 0} record`}</span>
       </div>
       {message && <div className="alert success">{message}</div>}
@@ -168,6 +171,7 @@ function MasterDataPage() {
           {(tab === 'crushers' || tab === 'piles') && <label><span>Plant</span><select value={String(form.plantId ?? '')} onChange={(e) => field('plantId', e.target.value)}><option value="">— belum dipetakan —</option>{lookups?.plants.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</select></label>}
           {tab === 'sources' && <><label><span>Block</span><input value={String(form.block ?? '')} onChange={(e) => field('block', e.target.value)} /></label><label><span>Material Category</span><input list="material-category-options" value={String(form.materialCategory ?? 'PILE')} onChange={(e) => field('materialCategory', e.target.value)} /><datalist id="material-category-options">{(lookups?.materialCategories?.length ? lookups.materialCategories : ['PILE', 'FILLER']).map((x) => <option key={x} value={x} />)}</datalist></label><label className="span-2"><span>Aliases</span><input value={String(form.aliases ?? '')} onChange={(e) => field('aliases', e.target.value)} /></label></>}
           {tab === 'piles' && <label><span>Class</span><input value={String(form.className ?? '')} onChange={(e) => field('className', e.target.value)} /></label>}
+          {(tab==='vendors'||tab==='equipment'||tab==='plants')&&<div className="span-2 inline-actions"><strong>Scope material:</strong><label><input type="checkbox" checked={Boolean(form.scopeLS)} onChange={e=>field('scopeLS',e.target.checked)}/> Limestone</label><label><input type="checkbox" checked={Boolean(form.scopeCL)} onChange={e=>field('scopeCL',e.target.checked)}/> Clay</label></div>}
           {modal.mode === 'edit' && <><label className="toggle-field"><span>Status</span><select value={Boolean(form.active) ? 'true' : 'false'} onChange={(e) => field('active', e.target.value === 'true')}><option value="true">ACTIVE</option><option value="false">INACTIVE</option></select></label><label className="span-2"><span>Alasan perubahan status / catatan audit</span><input value={String(form.reason ?? '')} onChange={(e) => field('reason', e.target.value)} placeholder="Wajib jika status berubah" /></label></>}
         </div>
         {saveMutation.error && <div className="alert error modal-alert">{saveMutation.error instanceof ApiClientError ? saveMutation.error.message : 'Gagal menyimpan master data.'}</div>}

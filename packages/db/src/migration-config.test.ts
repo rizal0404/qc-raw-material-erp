@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'node:test';
+import { migrationChecksumMatches, migrationChecksums } from './migration-checksum';
 import { loadMigrationDatabaseConfig } from './migration-config';
 
 const managedVariables = [
@@ -58,5 +59,15 @@ describe('migration database target configuration', () => {
       () => loadMigrationDatabaseConfig(),
       /expected Supabase project tejxcxlpoksittppontc, received wrongproject/,
     );
+  });
+});
+
+describe('migration checksum portability', () => {
+  it('uses an LF-canonical checksum on Windows and accepts a legacy raw checksum', () => {
+    const lf = 'BEGIN;\nSELECT 1;\nCOMMIT;\n';
+    const crlf = lf.replace(/\n/g, '\r\n');
+
+    assert.equal(migrationChecksums(lf).canonical, migrationChecksums(crlf).canonical);
+    assert.equal(migrationChecksumMatches(migrationChecksums(crlf).legacy, crlf), true);
   });
 });

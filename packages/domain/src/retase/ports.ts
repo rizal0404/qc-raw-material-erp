@@ -1,5 +1,5 @@
 import type { ShiftCode } from '@qc/contracts';
-import type { AssignmentAaResolutionRecord, CounterAssignmentRecord, OperationalAssignmentListFilter, OperationalAssignmentWriteRecord, RetaseEventRecord, RetaseEventWriteRecord, RetaseListFilter, RetaseSummaryRecord } from './types';
+import type { AssignmentAaResolutionRecord, ClayCounterColumnRecord, CounterAssignmentRecord, OperationalAssignmentListFilter, OperationalAssignmentWriteRecord, RetaseEventRecord, RetaseEventWriteRecord, RetaseListFilter, RetaseSummaryRecord } from './types';
 import type { AuditWriteInput } from '../master/types';
 
 export interface CounterLookup {
@@ -12,6 +12,7 @@ export interface RetaseEventRepository {
   listCounterAssignments(input:CounterLookup):Promise<CounterAssignmentRecord[]>;
   listAssignmentCandidatesForAa(input:CounterLookup & {aaId:string}):Promise<AssignmentAaResolutionRecord[]>;
   getAssignmentAaById(assignmentAaId:string):Promise<AssignmentAaResolutionRecord|null>;
+  getClayCounterColumn(columnId:string):Promise<ClayCounterColumnRecord|null>;
   findByRequestId(requestId:string):Promise<RetaseEventRecord|null>;
   getEventById(id:string):Promise<RetaseEventRecord|null>;
   appendEvent(input:RetaseEventWriteRecord):Promise<RetaseEventRecord>;

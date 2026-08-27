@@ -69,12 +69,12 @@ function UserManagementPage() {
   ], [lookups, statusMutation.isPending]);
 
   return <section className="page-stack">
-    <div className="page-heading"><div><p className="eyebrow">ADMINISTRATION / IAM</p><h1>User Management</h1><p>Role, vendor scope, dan crusher scope menggunakan canonical master data Slice 02.</p></div><button className="btn primary" type="button" onClick={openCreate}>+ Tambah User</button></div>
+    <div className="page-heading"><div><p className="eyebrow">ADMINISTRATION / IAM</p><h1>Manajemen Pengguna</h1><p>Kelola akun, peran, dan akses vendor atau crusher sesuai tanggung jawab pengguna.</p></div><button className="btn primary" type="button" onClick={openCreate}>+ Tambah User</button></div>
     {message && <div className="alert success">{message}</div>}
     {users.error && <div className="alert error">{users.error instanceof Error ? users.error.message : 'Gagal memuat user.'}</div>}
     <article className="card table-card"><DataTable data={users.data?.users ?? []} columns={columns} /></article>
 
-    {modal && <Modal title={modal.mode === 'create' ? 'Tambah User' : 'Edit User'} subtitle="Scope disimpan relational; role dan scope tetap divalidasi backend." onClose={() => setModal(null)} footer={<><button className="btn" type="button" onClick={() => setModal(null)}>Batal</button><button className="btn primary" type="button" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Menyimpan…' : 'Simpan'}</button></>}>
+    {modal && <Modal title={modal.mode === 'create' ? 'Tambah User' : 'Edit User'} subtitle="Tentukan peran dan akses operasional pengguna." onClose={() => setModal(null)} footer={<><button className="btn" type="button" onClick={() => setModal(null)}>Batal</button><button className="btn primary" type="button" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Menyimpan…' : 'Simpan'}</button></>}>
       <div className="form-grid">
         <label><span>Username</span><input disabled={modal.mode === 'edit'} value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} /></label>
         <label><span>Display Name</span><input value={form.displayName} onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))} /></label>

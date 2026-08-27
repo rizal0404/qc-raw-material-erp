@@ -14,10 +14,10 @@ function mapEvent(r:Record<string,unknown>):RetaseEventRecord{
   return {
     id:str(r.id),requestId:str(r.request_id),operationDate:str(r.operation_date),eventTs:date(r.event_ts),shiftCode:str(r.shift_code) as RetaseEventRecord['shiftCode'],
     crusherId:str(r.crusher_id),crusherCode:str(r.crusher_code),crusherName:str(r.crusher_name),vendorId:nullable(r.vendor_id),vendorName:nullable(r.vendor_name),
-    reportId:nullable(r.report_id),reportVersion:r.report_version==null?null:n(r.report_version),assignmentId:nullable(r.assignment_id),assignmentAaId:nullable(r.assignment_aa_id),assignmentOrigin:(r.assignment_origin==null?null:str(r.assignment_origin)) as RetaseEventRecord['assignmentOrigin'],
+    reportId:nullable(r.report_id),reportVersion:r.report_version==null?null:n(r.report_version),assignmentId:nullable(r.assignment_id),assignmentAaId:nullable(r.assignment_aa_id),assignmentOrigin:(r.assignment_origin==null?null:str(r.assignment_origin)) as RetaseEventRecord['assignmentOrigin'],clayReportId:nullable(r.clay_report_id),clayReportColumnId:nullable(r.clay_report_column_id),entrySource:(r.entry_source?str(r.entry_source):'LIVE_COUNTER') as RetaseEventRecord['entrySource'],entryBatchId:nullable(r.entry_batch_id),
     amId:nullable(r.am_id),aaId:nullable(r.aa_id),sourceId:nullable(r.source_id),sourceCode:nullable(r.source_code),pileId:nullable(r.pile_id),pileCode:nullable(r.pile_code),pileName:nullable(r.pile_name),blockSnapshot:nullable(r.block_snapshot),
     materialKind:(r.material_kind==null?null:String(r.material_kind)) as RetaseEventRecord['materialKind'],materialCategory:nullable(r.material_category),
-    vendorNameSnapshot:nullable(r.vendor_name_snapshot),amUnitNoSnapshot:nullable(r.am_unit_no_snapshot),aaUnitNoSnapshot:nullable(r.aa_unit_no_snapshot),
+    vendorNameSnapshot:nullable(r.vendor_name_snapshot),sourceNameSnapshot:nullable(r.source_name_snapshot),amUnitNoSnapshot:nullable(r.am_unit_no_snapshot),aaUnitNoSnapshot:nullable(r.aa_unit_no_snapshot),
     delta:n(r.delta) as 1|-1,eventType:str(r.event_type) as RetaseEventRecord['eventType'],status:str(r.status) as RetaseEventRecord['status'],createdBy:str(r.created_by),createdByName:str(r.created_by_name),
     reversesEventId:nullable(r.reverses_event_id),reason:nullable(r.reason),clientTs:r.client_ts?date(r.client_ts):null,
   };
@@ -49,7 +49,8 @@ export function createRetaseRepository(db:PostgresJsDatabase<typeof Schema>):Ret
     const [created]=await executor.insert(retaseEvents).values({
       requestId:input.requestId,operationDate:input.operationDate,shiftCode:input.shiftCode,crusherId:input.crusherId,vendorId:input.vendorId,
       reportId:input.reportId,reportVersion:input.reportVersion,assignmentId:input.assignmentId,assignmentAaId:input.assignmentAaId,assignmentOrigin:input.assignmentOrigin,amId:input.amId,aaId:input.aaId,
-      sourceId:input.sourceId,pileId:input.pileId,blockSnapshot:input.blockSnapshot,materialKind:input.materialKind,materialCategory:input.materialCategory,vendorNameSnapshot:input.vendorNameSnapshot,
+      clayReportId:input.clayReportId,clayReportColumnId:input.clayReportColumnId,entrySource:input.entrySource,entryBatchId:input.entryBatchId,
+      sourceId:input.sourceId,pileId:input.pileId,blockSnapshot:input.blockSnapshot,materialKind:input.materialKind,materialCategory:input.materialCategory,vendorNameSnapshot:input.vendorNameSnapshot,sourceNameSnapshot:input.sourceNameSnapshot,
       amUnitNoSnapshot:input.amUnitNoSnapshot,aaUnitNoSnapshot:input.aaUnitNoSnapshot,delta:input.delta,eventType:input.eventType,status:input.status,createdBy:input.createdBy,
       reversesEventId:input.reversesEventId,reason:input.reason,clientTs:input.clientTs,
     }).returning({id:retaseEvents.id});
@@ -89,6 +90,12 @@ export function createRetaseRepository(db:PostgresJsDatabase<typeof Schema>):Ret
   }
 
   return {
+    async getClayCounterColumn(columnId){const rows=await db.execute(sql`
+      SELECT col.id,col.report_id,r.operation_date,r.shift_code,r.crusher_id,r.status report_status,col.status column_status,
+             col.vendor_id,coalesce(v.name,col.vendor_name_snapshot) vendor_name,col.source_id,coalesce(s.name,col.source_name_snapshot) source_name,
+             col.pile_id,col.header_primary,col.header_secondary
+      FROM clay_report_columns col JOIN clay_shift_reports r ON r.id=col.report_id LEFT JOIN vendors v ON v.id=col.vendor_id LEFT JOIN sources s ON s.id=col.source_id
+      WHERE col.id=${columnId}::uuid LIMIT 1`);const x=(rows as unknown as Array<Record<string,unknown>>)[0];return x?{id:str(x.id),reportId:str(x.report_id),operationDate:str(x.operation_date),shiftCode:str(x.shift_code) as ShiftCode,crusherId:str(x.crusher_id),reportStatus:str(x.report_status) as 'DRAFT'|'SUBMITTED'|'APPROVED'|'SUPERSEDED',columnStatus:str(x.column_status) as 'PROVISIONAL'|'CONFIRMED'|'INACTIVE',vendorId:nullable(x.vendor_id),vendorName:nullable(x.vendor_name),sourceId:nullable(x.source_id),sourceName:nullable(x.source_name),pileId:nullable(x.pile_id),headerPrimary:str(x.header_primary),headerSecondary:nullable(x.header_secondary)}:null;},
     async listCounterAssignments(input){
       const rows=await db.execute(sql`
         SELECT la.id,la.assignment_origin,la.operation_date,la.shift_code,la.report_id,vsr.version AS report_version,la.vendor_id,v.code AS vendor_code,v.name AS vendor_name,
@@ -242,11 +249,11 @@ export function createRetaseRepository(db:PostgresJsDatabase<typeof Schema>):Ret
     listOperationalAssignments:operationalAssignments,
     getOperationalAssignment:operationalById,
     async createOperationalAssignment(input,actorUserId){
-      const id=await db.transaction(async tx=>{const [created]=await tx.insert(loadingAssignments).values({reportId:null,assignmentOrigin:'OPERATIONAL',operationDate:input.operationDate,shiftCode:input.shiftCode,vendorId:input.vendorId,amId:input.amId,sourceId:input.sourceId,crusherId:input.crusherId,pileId:input.pileId,blockSnapshot:input.blockSnapshot,materialKind:input.materialKind,materialCategory:input.materialCategory,validFrom:input.validFrom,validTo:input.validTo,status:'ACTIVE',note:input.note,createdBy:actorUserId,updatedBy:actorUserId}).returning({id:loadingAssignments.id});if(!created)throw new Error('Gagal membuat operational assignment.');await tx.insert(loadingAssignmentAas).values(input.aaIds.map(aaId=>({assignmentId:created.id,aaId,validFrom:input.validFrom,validTo:input.validTo,active:true})));return created.id;});
+      const id=await db.transaction(async tx=>{const [created]=await tx.insert(loadingAssignments).values({reportId:null,assignmentOrigin:'OPERATIONAL',operationDate:input.operationDate,shiftCode:input.shiftCode,vendorId:input.vendorId,amId:input.amId,sourceId:input.sourceId,crusherId:input.crusherId,pileId:input.pileId,blockSnapshot:input.blockSnapshot,materialKind:input.materialKind,materialCategory:input.materialCategory,validFrom:input.validFrom,validTo:input.validTo,status:'ACTIVE',note:input.note,createdBy:actorUserId,updatedBy:actorUserId}).returning({id:loadingAssignments.id});if(!created)throw new Error('Gagal membuat operational assignment.');await tx.insert(loadingAssignmentAas).values(input.aaIds.map(aaId=>({assignmentId:created.id,aaId,materialKind:input.materialKind,validFrom:input.validFrom,validTo:input.validTo,active:true})));return created.id;});
       const created=await operationalById(id);if(!created)throw new Error('Operational assignment tersimpan tetapi gagal direload.');return created;
     },
     async updateOperationalAssignment(id,input,actorUserId){
-      await db.transaction(async tx=>{const locked=await tx.execute(sql`SELECT id,status FROM loading_assignments WHERE id=${id}::uuid AND assignment_origin='OPERATIONAL' FOR UPDATE`);const row=(locked as unknown as Array<Record<string,unknown>>)[0];if(!row)throw new Error('Operational assignment tidak ditemukan.');if(str(row.status)!=='ACTIVE')throw new Error('Hanya operational assignment ACTIVE yang dapat diubah.');await tx.update(loadingAssignments).set({amId:input.amId,sourceId:input.sourceId,crusherId:input.crusherId,pileId:input.pileId,blockSnapshot:input.blockSnapshot,materialKind:input.materialKind,materialCategory:input.materialCategory,validFrom:input.validFrom,validTo:input.validTo,note:input.note,updatedBy:actorUserId,updatedAt:new Date()}).where(eq(loadingAssignments.id,id));await tx.delete(loadingAssignmentAas).where(eq(loadingAssignmentAas.assignmentId,id));await tx.insert(loadingAssignmentAas).values(input.aaIds.map(aaId=>({assignmentId:id,aaId,validFrom:input.validFrom,validTo:input.validTo,active:true})));});
+      await db.transaction(async tx=>{const locked=await tx.execute(sql`SELECT id,status FROM loading_assignments WHERE id=${id}::uuid AND assignment_origin='OPERATIONAL' FOR UPDATE`);const row=(locked as unknown as Array<Record<string,unknown>>)[0];if(!row)throw new Error('Operational assignment tidak ditemukan.');if(str(row.status)!=='ACTIVE')throw new Error('Hanya operational assignment ACTIVE yang dapat diubah.');await tx.update(loadingAssignments).set({amId:input.amId,sourceId:input.sourceId,crusherId:input.crusherId,pileId:input.pileId,blockSnapshot:input.blockSnapshot,materialKind:input.materialKind,materialCategory:input.materialCategory,validFrom:input.validFrom,validTo:input.validTo,note:input.note,updatedBy:actorUserId,updatedAt:new Date()}).where(eq(loadingAssignments.id,id));await tx.delete(loadingAssignmentAas).where(eq(loadingAssignmentAas.assignmentId,id));await tx.insert(loadingAssignmentAas).values(input.aaIds.map(aaId=>({assignmentId:id,aaId,materialKind:input.materialKind,validFrom:input.validFrom,validTo:input.validTo,active:true})));});
       const updated=await operationalById(id);if(!updated)throw new Error('Operational assignment diubah tetapi gagal direload.');return updated;
     },
     async cancelOperationalAssignment(id,actorUserId){

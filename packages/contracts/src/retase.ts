@@ -143,6 +143,7 @@ export const RecordRetaseEventRequestSchema = z.object({
   operationDate: IsoDateSchema,
   shiftCode: ShiftCodeSchema,
   crusherId: z.string().uuid(),
+  clayReportColumnId: z.string().uuid().optional(),
   assignmentAaId: z.string().uuid().optional(),
   aaId: z.string().uuid().optional(),
   vendorId: z.string().uuid().optional(),
@@ -150,7 +151,7 @@ export const RecordRetaseEventRequestSchema = z.object({
   reason: z.string().trim().min(3).max(500).optional(),
   clientTs: z.string().datetime().optional(),
 }).superRefine((value, ctx) => {
-  if (!value.assignmentAaId) {
+  if (!value.assignmentAaId && !value.clayReportColumnId) {
     if (!value.aaId && !value.unlistedUnitNo) {
       ctx.addIssue({ code: 'custom', path: ['unlistedUnitNo'], message: 'AA atau nomor unit wajib untuk Unlisted AA.' });
     }
@@ -181,12 +182,17 @@ export const RetaseEventSchema = z.object({
   assignmentId: z.string().uuid().nullable(),
   assignmentAaId: z.string().uuid().nullable(),
   assignmentOrigin: AssignmentOriginSchema.nullable(),
+  clayReportId: z.string().uuid().nullable(),
+  clayReportColumnId: z.string().uuid().nullable(),
+  entrySource: z.enum(['LIVE_COUNTER','QC_BACKFILL','IMPORT']),
+  entryBatchId: z.string().uuid().nullable(),
   amId: z.string().uuid().nullable(),
   amUnitNo: z.string().nullable(),
   aaId: z.string().uuid().nullable(),
   aaUnitNo: z.string().nullable(),
   sourceId: z.string().uuid().nullable(),
   sourceCode: z.string().nullable(),
+  sourceName: z.string().nullable(),
   pileId: z.string().uuid().nullable(),
   pileCode: z.string().nullable(),
   pileName: z.string().nullable(),

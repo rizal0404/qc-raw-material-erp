@@ -5,6 +5,7 @@ export * from './iam';
 export * from './roles';
 
 export * from './master';
+export * from './clay-report';
 export * from './qc';
 
 export * from './vendor-operation';

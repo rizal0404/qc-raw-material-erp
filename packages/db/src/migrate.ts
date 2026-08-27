@@ -1,8 +1,8 @@
-import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
+import { migrationChecksumMatches, migrationChecksums } from './migration-checksum';
 import { loadMigrationDatabaseConfig } from './migration-config';
 
 const migrationConfig = loadMigrationDatabaseConfig();
@@ -40,10 +40,10 @@ try {
   const files = (await readdir(migrationsDir)).filter((name) => /^\d+_.*\.sql$/.test(name)).sort();
   for (const filename of files) {
     const content = await readFile(resolve(migrationsDir, filename), 'utf8');
-    const checksum = createHash('sha256').update(content).digest('hex');
+    const checksum = migrationChecksums(content).canonical;
     const [existing] = await sql<{ checksum: string }[]>`SELECT checksum FROM app_schema_migrations WHERE filename = ${filename}`;
     if (existing) {
-      if (existing.checksum !== checksum) throw new Error(`Migration checksum changed after apply: ${filename}`);
+      if (!migrationChecksumMatches(existing.checksum, content)) throw new Error(`Migration checksum changed after apply: ${filename}`);
       console.log(`skip ${filename}`);
       continue;
     }

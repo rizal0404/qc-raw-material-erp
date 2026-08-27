@@ -16,3 +16,5 @@ Status values: `PROPOSED`, `ACCEPTED`, `SUPERSEDED`, `REJECTED`.
 | ADR-010 | Repository ports/adapters isolate database implementation | ACCEPTED |
 | ADR-011 | Deployment portability: Vercel or persistent VPS | ACCEPTED |
 | ADR-012 | QC retase allocation uses exact event consumption | ACCEPTED |
+| ADR-013 | Clay report is an independent shift aggregate | ACCEPTED |
+| ADR-014 | Clay consumes crusher-column quantities directly in mixing | ACCEPTED |

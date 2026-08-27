@@ -46,27 +46,29 @@ function omitReason<T extends { reason?: string | undefined }>(input: T): Omit<T
 function iso(value: Date): string { return value.toISOString(); }
 
 export function createMasterService(repository: MasterRepository) {
-  async function ensureVendor(vendorId: string) {
+  async function ensureVendor(vendorId: string, materialKind?: MaterialKind) {
     const vendor = await repository.findVendorById(vendorId);
     if (!vendor) throw notFound('Vendor tidak ditemukan.');
     if (!vendor.active) throw new AppError(400, 'INACTIVE_REFERENCE', 'Vendor yang dinonaktifkan tidak dapat digunakan untuk master baru.');
+    if (materialKind && !vendor.materialKinds.includes(materialKind)) throw new AppError(400, 'MATERIAL_SCOPE_MISMATCH', `Vendor tidak tersedia untuk material ${materialKind}.`);
     return vendor;
   }
-  async function ensurePlant(plantId: string | null | undefined) {
+  async function ensurePlant(plantId: string | null | undefined, materialKind?: MaterialKind) {
     if (!plantId) return null;
     const plant = await repository.findPlantById(plantId);
     if (!plant) throw notFound('Plant tidak ditemukan.');
     if (!plant.active) throw new AppError(400, 'INACTIVE_REFERENCE', 'Plant yang dinonaktifkan tidak dapat digunakan untuk master baru.');
+    if (materialKind && !plant.materialKinds.includes(materialKind)) throw new AppError(400, 'MATERIAL_SCOPE_MISMATCH', `Plant tidak tersedia untuk material ${materialKind}.`);
     return plant;
   }
-  async function ensureUniqueCode(entity: string, code: string, currentId?: string) {
+  async function ensureUniqueCode(entity: string, code: string, currentId?: string, materialKind?: MaterialKind) {
     const canonical = canonicalCode(code);
     let existing: { id: string } | null = null;
     if (entity === 'VENDOR') existing = await repository.findVendorByCode(canonical);
     if (entity === 'PLANT') existing = await repository.findPlantByCode(canonical);
     if (entity === 'CRUSHER') existing = await repository.findCrusherByCode(canonical);
-    if (entity === 'SOURCE') existing = await repository.findSourceByCode(canonical);
-    if (entity === 'PILE') existing = await repository.findPileByCode(canonical);
+    if (entity === 'SOURCE') existing = await repository.findSourceByCode(canonical, materialKind);
+    if (entity === 'PILE') existing = await repository.findPileByCode(canonical, materialKind);
     if (existing && existing.id !== currentId) throw conflict('MASTER_CODE_EXISTS', `Code ${canonical} sudah digunakan.`);
     return canonical;
   }
@@ -101,7 +103,7 @@ export function createMasterService(repository: MasterRepository) {
   return {
     activeFromQuery,
 
-    async listVendors(filter: MasterListInput) {
+    async listVendors(filter: MasterListInput & { materialKind?: MaterialKind | undefined }) {
       const result = await repository.listVendors(filter);
       return { items: result.items.map(mapVendor), total: result.total };
     },
@@ -110,7 +112,7 @@ export function createMasterService(repository: MasterRepository) {
       const aliases = cleanAliases(input.aliases);
       await ensureVendorAliasesAvailable(aliases);
       const created = await repository.createVendor({
-        code, name: input.name.trim(), aliases, contactEmail: cleanText(input.contactEmail),
+        code, name: input.name.trim(), aliases, contactEmail: cleanText(input.contactEmail), materialKinds: input.materialKinds,
       });
       await audit(actor, 'MASTER_VENDOR_CREATED', 'VENDOR', created.id, null, created, undefined, requestId);
       return mapVendor(created);
@@ -125,6 +127,7 @@ export function createMasterService(repository: MasterRepository) {
       if (raw.name !== undefined) patch.name = raw.name.trim();
       if (raw.aliases !== undefined) { const aliases = cleanAliases(raw.aliases); await ensureVendorAliasesAvailable(aliases, id); patch.aliases = aliases; }
       if (raw.contactEmail !== undefined) patch.contactEmail = cleanText(raw.contactEmail);
+      if (raw.materialKinds !== undefined) patch.materialKinds = raw.materialKinds;
       if (raw.active !== undefined) patch.active = raw.active;
       const updated = await repository.updateVendor(id, patch);
       if (!updated) throw notFound('Vendor tidak ditemukan.');
@@ -132,13 +135,13 @@ export function createMasterService(repository: MasterRepository) {
       return mapVendor(updated);
     },
 
-    async listPlants(filter: MasterListInput) {
+    async listPlants(filter: MasterListInput & { materialKind?: MaterialKind | undefined }) {
       const result = await repository.listPlants(filter);
       return { items: result.items.map(mapPlant), total: result.total };
     },
     async createPlant(actor: AuthPrincipal, input: CreatePlantRequest, requestId?: string) {
       const code = await ensureUniqueCode('PLANT', input.code);
-      const created = await repository.createPlant({ code, name: input.name.trim() });
+      const created = await repository.createPlant({ code, name: input.name.trim(), materialKinds: input.materialKinds });
       await audit(actor, 'MASTER_PLANT_CREATED', 'PLANT', created.id, null, created, undefined, requestId);
       return mapPlant(created);
     },
@@ -150,6 +153,7 @@ export function createMasterService(repository: MasterRepository) {
       const patch: Parameters<MasterRepository['updatePlant']>[1] = {};
       if (raw.code !== undefined) patch.code = await ensureUniqueCode('PLANT', raw.code, id);
       if (raw.name !== undefined) patch.name = raw.name.trim();
+      if (raw.materialKinds !== undefined) patch.materialKinds = raw.materialKinds;
       if (raw.active !== undefined) patch.active = raw.active;
       const updated = await repository.updatePlant(id, patch);
       if (!updated) throw notFound('Plant tidak ditemukan.');
@@ -163,7 +167,7 @@ export function createMasterService(repository: MasterRepository) {
     },
     async createCrusher(actor: AuthPrincipal, input: CreateCrusherRequest, requestId?: string) {
       const code = await ensureUniqueCode('CRUSHER', input.code);
-      await ensurePlant(input.plantId);
+      await ensurePlant(input.plantId, input.materialKind);
       const created = await repository.createCrusher({ code, name: input.name.trim(), materialKind: input.materialKind, plantId: input.plantId ?? null });
       await audit(actor, 'MASTER_CRUSHER_CREATED', 'CRUSHER', created.id, null, created, undefined, requestId);
       return mapCrusher(created);
@@ -177,7 +181,10 @@ export function createMasterService(repository: MasterRepository) {
       if (raw.code !== undefined) patch.code = await ensureUniqueCode('CRUSHER', raw.code, id);
       if (raw.name !== undefined) patch.name = raw.name.trim();
       if (raw.materialKind !== undefined) patch.materialKind = raw.materialKind;
-      if (raw.plantId !== undefined) { await ensurePlant(raw.plantId); patch.plantId = raw.plantId; }
+      if (raw.plantId !== undefined || raw.materialKind !== undefined) {
+        await ensurePlant(raw.plantId !== undefined ? raw.plantId : before.plantId, raw.materialKind ?? before.materialKind);
+      }
+      if (raw.plantId !== undefined) patch.plantId = raw.plantId;
       if (raw.active !== undefined) patch.active = raw.active;
       const updated = await repository.updateCrusher(id, patch);
       if (!updated) throw notFound('Crusher tidak ditemukan.');
@@ -185,16 +192,16 @@ export function createMasterService(repository: MasterRepository) {
       return mapCrusher(updated);
     },
 
-    async listEquipment(filter: MasterListInput & { vendorId?: string | undefined; type?: EquipmentType | undefined }) {
+    async listEquipment(filter: MasterListInput & { vendorId?: string | undefined; type?: EquipmentType | undefined; materialKind?: MaterialKind | undefined }) {
       const result = await repository.listEquipment(filter);
       return { items: result.items.map(mapEquipment), total: result.total };
     },
     async createEquipment(actor: AuthPrincipal, input: CreateEquipmentRequest, requestId?: string) {
-      await ensureVendor(input.vendorId);
+      for (const materialKind of input.materialKinds) await ensureVendor(input.vendorId, materialKind);
       const unitNo = canonicalUnitNo(input.unitNo);
       const duplicate = await repository.findEquipmentByBusinessKey(input.vendorId, input.type, unitNo);
       if (duplicate) throw conflict('EQUIPMENT_EXISTS', `${input.type} ${unitNo} sudah terdaftar untuk vendor tersebut.`);
-      const created = await repository.createEquipment({ vendorId: input.vendorId, type: input.type, unitNo, brand: cleanText(input.brand), model: cleanText(input.model), aliases: cleanAliases(input.aliases) });
+      const created = await repository.createEquipment({ vendorId: input.vendorId, type: input.type, unitNo, brand: cleanText(input.brand), model: cleanText(input.model), aliases: cleanAliases(input.aliases), materialKinds: input.materialKinds });
       await audit(actor, 'MASTER_EQUIPMENT_CREATED', 'EQUIPMENT', created.id, null, created, undefined, requestId);
       return mapEquipment(created);
     },
@@ -206,7 +213,9 @@ export function createMasterService(repository: MasterRepository) {
       const vendorId = raw.vendorId ?? before.vendorId;
       const type = raw.type ?? before.type;
       const unitNo = raw.unitNo !== undefined ? canonicalUnitNo(raw.unitNo) : before.unitNo;
-      if (raw.vendorId !== undefined) await ensureVendor(raw.vendorId);
+      if (raw.vendorId !== undefined || raw.materialKinds !== undefined) {
+        for (const materialKind of raw.materialKinds ?? before.materialKinds) await ensureVendor(vendorId, materialKind);
+      }
       if (raw.vendorId !== undefined || raw.type !== undefined || raw.unitNo !== undefined) {
         const duplicate = await repository.findEquipmentByBusinessKey(vendorId, type, unitNo);
         if (duplicate && duplicate.id !== id) throw conflict('EQUIPMENT_EXISTS', `${type} ${unitNo} sudah terdaftar untuk vendor tersebut.`);
@@ -218,6 +227,7 @@ export function createMasterService(repository: MasterRepository) {
       if (raw.brand !== undefined) patch.brand = cleanText(raw.brand);
       if (raw.model !== undefined) patch.model = cleanText(raw.model);
       if (raw.aliases !== undefined) patch.aliases = cleanAliases(raw.aliases);
+      if (raw.materialKinds !== undefined) patch.materialKinds = raw.materialKinds;
       if (raw.active !== undefined) patch.active = raw.active;
       const updated = await repository.updateEquipment(id, patch);
       if (!updated) throw notFound('Equipment tidak ditemukan.');
@@ -230,7 +240,7 @@ export function createMasterService(repository: MasterRepository) {
       return { items: result.items.map(mapSource), total: result.total };
     },
     async createSource(actor: AuthPrincipal, input: CreateSourceRequest, requestId?: string) {
-      const code = await ensureUniqueCode('SOURCE', input.code);
+      const code = await ensureUniqueCode('SOURCE', input.code, undefined, input.materialKind);
       const created = await repository.createSource({ code, name: input.name.trim(), block: cleanText(input.block), materialCategory: canonicalCategory(input.materialCategory), materialKind: input.materialKind, aliases: cleanAliases(input.aliases) });
       await audit(actor, 'MASTER_SOURCE_CREATED', 'SOURCE', created.id, null, created, undefined, requestId);
       return mapSource(created);
@@ -241,7 +251,7 @@ export function createMasterService(repository: MasterRepository) {
       assertReasonWhenChangingActive(before.active, input.active, input.reason);
       const raw = omitReason(input);
       const patch: Parameters<MasterRepository['updateSource']>[1] = {};
-      if (raw.code !== undefined) patch.code = await ensureUniqueCode('SOURCE', raw.code, id);
+      if (raw.code !== undefined || raw.materialKind !== undefined) patch.code = await ensureUniqueCode('SOURCE', raw.code ?? before.code, id, raw.materialKind ?? before.materialKind);
       if (raw.name !== undefined) patch.name = raw.name.trim();
       if (raw.block !== undefined) patch.block = cleanText(raw.block);
       if (raw.materialCategory !== undefined) patch.materialCategory = canonicalCategory(raw.materialCategory);
@@ -259,8 +269,8 @@ export function createMasterService(repository: MasterRepository) {
       return { items: result.items.map(mapPile), total: result.total };
     },
     async createPile(actor: AuthPrincipal, input: CreatePileRequest, requestId?: string) {
-      const code = await ensureUniqueCode('PILE', input.code);
-      await ensurePlant(input.plantId);
+      const code = await ensureUniqueCode('PILE', input.code, undefined, input.materialKind);
+      await ensurePlant(input.plantId, input.materialKind);
       const created = await repository.createPile({ code, name: input.name.trim(), materialKind: input.materialKind, plantId: input.plantId ?? null, className: cleanText(input.className) });
       await audit(actor, 'MASTER_PILE_CREATED', 'PILE', created.id, null, created, undefined, requestId);
       return mapPile(created);
@@ -271,10 +281,13 @@ export function createMasterService(repository: MasterRepository) {
       assertReasonWhenChangingActive(before.active, input.active, input.reason);
       const raw = omitReason(input);
       const patch: Parameters<MasterRepository['updatePile']>[1] = {};
-      if (raw.code !== undefined) patch.code = await ensureUniqueCode('PILE', raw.code, id);
+      if (raw.code !== undefined || raw.materialKind !== undefined) patch.code = await ensureUniqueCode('PILE', raw.code ?? before.code, id, raw.materialKind ?? before.materialKind);
       if (raw.name !== undefined) patch.name = raw.name.trim();
       if (raw.materialKind !== undefined) patch.materialKind = raw.materialKind;
-      if (raw.plantId !== undefined) { await ensurePlant(raw.plantId); patch.plantId = raw.plantId; }
+      if (raw.plantId !== undefined || raw.materialKind !== undefined) {
+        await ensurePlant(raw.plantId !== undefined ? raw.plantId : before.plantId, raw.materialKind ?? before.materialKind);
+      }
+      if (raw.plantId !== undefined) patch.plantId = raw.plantId;
       if (raw.className !== undefined) patch.className = cleanText(raw.className);
       if (raw.active !== undefined) patch.active = raw.active;
       const updated = await repository.updatePile(id, patch);
@@ -297,13 +310,13 @@ export function createMasterService(repository: MasterRepository) {
       }
     },
 
-    async getLookupBootstrap(principal: AuthPrincipal) {
+    async getLookupBootstrap(principal: AuthPrincipal, materialKind?: MaterialKind) {
       const [vendorResult, plantsResult, crusherResult, sourceResult, pileResult, shifts, materialCategories] = await Promise.all([
-        repository.listVendors({ active: true, limit: 250, offset: 0 }),
-        repository.listPlants({ active: true, limit: 250, offset: 0 }),
-        repository.listCrushers({ active: true, limit: 250, offset: 0 }),
-        repository.listSources({ active: true, limit: 250, offset: 0 }),
-        repository.listPiles({ active: true, limit: 250, offset: 0 }),
+        repository.listVendors({ active: true, limit: 250, offset: 0, ...(materialKind ? { materialKind } : {}) }),
+        repository.listPlants({ active: true, limit: 250, offset: 0, ...(materialKind ? { materialKind } : {}) }),
+        repository.listCrushers({ active: true, limit: 250, offset: 0, ...(materialKind ? { materialKind } : {}) }),
+        repository.listSources({ active: true, limit: 250, offset: 0, ...(materialKind ? { materialKind } : {}) }),
+        repository.listPiles({ active: true, limit: 250, offset: 0, ...(materialKind ? { materialKind } : {}) }),
         repository.listShifts(true),
         repository.listMaterialCategories(true),
       ]);
@@ -312,8 +325,8 @@ export function createMasterService(repository: MasterRepository) {
         ? crusherResult.items.filter((c) => principal.crusherIds.includes(c.id))
         : crusherResult.items;
       return {
-        vendors: vendors.map((v) => ({ id: v.id, code: v.code, label: v.name, active: v.active })),
-        plants: plantsResult.items.map((v) => ({ id: v.id, code: v.code, label: v.name, active: v.active })),
+        vendors: vendors.map((v) => ({ id: v.id, code: v.code, label: v.name, active: v.active, materialKinds: v.materialKinds })),
+        plants: plantsResult.items.map((v) => ({ id: v.id, code: v.code, label: v.name, active: v.active, materialKinds: v.materialKinds })),
         crushers: crusherItems.map((v) => ({ id: v.id, code: v.code, label: v.name, active: v.active, materialKind: v.materialKind, plantId: v.plantId })),
         sources: sourceResult.items.map((v) => ({ id: v.id, code: v.code, label: v.name, active: v.active, materialKind: v.materialKind, materialCategory: v.materialCategory, block: v.block })),
         piles: pileResult.items.map((v) => ({ id: v.id, code: v.code, label: v.name, active: v.active, materialKind: v.materialKind, plantId: v.plantId, className: v.className })),
@@ -322,11 +335,11 @@ export function createMasterService(repository: MasterRepository) {
       };
     },
 
-    async getEquipmentLookup(principal: AuthPrincipal, vendorId?: string, type?: EquipmentType) {
+    async getEquipmentLookup(principal: AuthPrincipal, vendorId?: string, type?: EquipmentType, materialKind?: MaterialKind) {
       let effectiveVendorId = vendorId;
       if (principal.role === 'VENDOR') effectiveVendorId = principal.vendorId ?? undefined;
-      const result = await repository.listEquipment({ active: true, limit: 250, offset: 0, ...(effectiveVendorId ? { vendorId: effectiveVendorId } : {}), ...(type ? { type } : {}) });
-      return result.items.map((v) => ({ id: v.id, code: `${v.vendorCode}:${v.type}:${v.unitNo}`, label: `${v.unitNo}${v.brand ? ` · ${v.brand}` : ''}`, active: v.active, vendorId: v.vendorId, type: v.type, unitNo: v.unitNo }));
+      const result = await repository.listEquipment({ active: true, limit: 250, offset: 0, ...(effectiveVendorId ? { vendorId: effectiveVendorId } : {}), ...(type ? { type } : {}), ...(materialKind ? { materialKind } : {}) });
+      return result.items.map((v) => ({ id: v.id, code: `${v.vendorCode}:${v.type}:${v.unitNo}`, label: `${v.unitNo}${v.brand ? ` · ${v.brand}` : ''}`, active: v.active, vendorId: v.vendorId, type: v.type, unitNo: v.unitNo, materialKinds: v.materialKinds }));
     },
   };
 }

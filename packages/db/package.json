@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
     "lint": "echo lint-placeholder",
-    "test": "node --import=tsx --test src/migration-config.test.ts"
+    "test": "node --import=tsx --test src/migration-config.test.ts",
+    "test:clay-db": "node --env-file-if-exists=../../.env --import=tsx --test src/clay-retase.integration.test.ts"
   },
   "dependencies": {
     "@qc/contracts": "workspace:*",

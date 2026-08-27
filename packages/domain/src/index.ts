@@ -6,6 +6,9 @@ export * from './vendor-operation/ports';
 
 export * from './master/ports';
 export * from './master/types';
+export * from './clay-report/ports';
+export * from './clay-report/types';
+export * from './clay-report/values';
 export * from './qc/chemistry';
 export * from './qc/mix-code';
 export * from './qc/ton-per-retase';

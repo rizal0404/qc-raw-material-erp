@@ -96,6 +96,10 @@ Minimum body shape:
 
 For Limestone, `batchNo` is mandatory. For Clay, `tiangKe` is mandatory.
 
+As of ADR-014, Clay items also require `clayRetaseSources: [{ "columnId": "<uuid>", "retase": 5 }]`; contributions must sum to the item's retase. Multiple columns per item and partial consumption are supported. `retaseAllocationIds` must be empty on Clay; `clayRetaseSources` must be empty on Limestone. Confirmed column, material, operation date, shift, and available balance are checked transactionally. Recall returns the same column/quantity references. Replace releases old consumption and writes new consumption atomically.
+
+`GET /workbench/clay-retase?operationDate=YYYY-MM-DD&shiftCode=SHIFT_1` (QC/Supervisor) returns saved crusher-column totals and remaining capacity, including saved DRAFT reports. No reconciliation allocation is created. See `clay-shift-report-workflow.md` for response fields, errors, and workflow rules.
+
 ### `POST /mixes/:mixCode/replace`
 Same mix payload plus:
 ```json

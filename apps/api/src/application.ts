@@ -4,7 +4,7 @@ import cookie from '@fastify/cookie';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { ZodError } from 'zod';
-import { createDatabase, createIamRepository, createMasterRepository, createQcRepository, createVendorOperationRepository, createRetaseRepository, createReconciliationRepository, createStockpileMapRepository } from '@qc/db';
+import { createClayReportRepository, createDatabase, createIamRepository, createMasterRepository, createQcRepository, createVendorOperationRepository, createRetaseRepository, createReconciliationRepository, createStockpileMapRepository } from '@qc/db';
 import type { AppConfig } from './config';
 import { AppError } from './lib/errors';
 import { registerSystemRoutes } from './modules/system/routes';
@@ -25,6 +25,8 @@ import { registerReconciliationRoutes } from './modules/reconciliation/routes';
 import { createReconciliationService } from './modules/reconciliation/service';
 import { registerStockpileMapRoutes } from './modules/stockpile-map/routes';
 import { createStockpileMapService } from './modules/stockpile-map/service';
+import { registerClayReportRoutes } from './modules/clay-report/routes';
+import { createClayReportService } from './modules/clay-report/service';
 
 function isAllowedOrigin(config: AppConfig, origin: string | undefined): boolean {
   if (!origin) return true;
@@ -47,6 +49,8 @@ export async function buildApp(config: AppConfig) {
   const reconciliationService = createReconciliationService(reconciliationRepository);
   const stockpileMapRepository = createStockpileMapRepository(database.db);
   const stockpileMapService = createStockpileMapService(stockpileMapRepository, masterRepository, qcRepository);
+  const clayReportRepository = createClayReportRepository(database.db);
+  const clayReportService = createClayReportService(clayReportRepository, masterRepository);
   const authService = createAuthService({
     repository: iamRepository,
     passwordHasher: createArgonPasswordHasher({ pepper: config.auth.passwordPepper }),
@@ -112,6 +116,14 @@ export async function buildApp(config: AppConfig) {
       return reply.status(409).send({ ok: false, code: 'REFERENCE_CONFLICT', message: 'Data masih direferensikan atau foreign key tidak valid.', requestId: request.id });
     }
     if (postgresCode === '23514') {
+      const constraint=(error as {constraint_name?:string;cause?:{constraint_name?:string}}).constraint_name??(error as {cause?:{constraint_name?:string}}).cause?.constraint_name;
+      const clayErrors:Record<string,string>={
+        clay_consumption_balance:'Retase Clay tidak cukup atau sudah dipakai mixing. Muat ulang retase; untuk mengurangi laporan, kurangi pemakaian melalui Replace Mix terlebih dahulu.',
+        clay_consumption_context:'Kolom laporan Clay harus CONFIRMED, aktif, serta sesuai tanggal dan shift mixing. Periksa sumber retase yang dipilih.',
+        clay_consumption_identity:'Identitas kolom Clay sudah dipakai mixing dan harus dipertahankan untuk riwayat. Buat kolom baru untuk sumber berbeda.',
+        clay_consumption_immutable:'Pemakaian retase Clay hanya dapat diubah melalui Replace Mix.',
+      };
+      if(constraint&&clayErrors[constraint])return reply.status(409).send({ok:false,code:constraint.toUpperCase(),message:clayErrors[constraint],requestId:request.id});
       return reply.status(400).send({ ok: false, code: 'CONSTRAINT_VIOLATION', message: 'Data melanggar aturan integritas database.', requestId: request.id });
     }
     request.log.error(error);
@@ -140,6 +152,7 @@ export async function buildApp(config: AppConfig) {
     await registerRetaseRoutes(v1, retaseService);
     await registerReconciliationRoutes(v1, reconciliationService);
     await registerStockpileMapRoutes(v1, stockpileMapService);
+    await registerClayReportRoutes(v1, clayReportService);
     // Next slices: operations-reporting/audit explorer.
   }, { prefix: '/api/v1' });
 

@@ -6,6 +6,8 @@
 
 All authorization is enforced server-side. Client-supplied role/vendor scope is never authoritative.
 
+**Scope update — 2026-08-27:** workflow ini khusus Limestone. List `materialKind=CL` dan create/update/confirm allocation Clay ditolak dengan `CLAY_DIRECT_WORKFLOW`; suggestion legacy Clay mengembalikan daftar kosong. Clay memakai `/workbench/clay-retase` dan `items[].clayRetaseSources` langsung pada Save/Replace Mix (lihat `clay-shift-report-workflow.md` dan ADR-014). Data historis tidak dihapus.
+
 ## 1. List Reconciliation
 
 ### `GET /reconciliation`

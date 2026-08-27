@@ -23,6 +23,7 @@ function reportValues(input: ShiftReportWriteRecord, actorUserId: string) {
     operationDate: input.operationDate,
     shiftCode: input.shiftCode,
     vendorId: input.vendorId,
+    materialKind: input.materialKind,
     amTotal: input.am.total,
     amOperating: input.am.operating,
     amStandby: input.am.standby,
@@ -116,6 +117,7 @@ export function createVendorOperationRepository(db: PostgresJsDatabase<typeof Sc
       vendorId: vendorShiftReports.vendorId,
       vendorCode: vendors.code,
       vendorName: vendors.name,
+      materialKind: vendorShiftReports.materialKind,
       version: vendorShiftReports.version,
       status: vendorShiftReports.status,
       amTotal: vendorShiftReports.amTotal,
@@ -156,6 +158,7 @@ export function createVendorOperationRepository(db: PostgresJsDatabase<typeof Sc
       vendorId: row.vendorId,
       vendorCode: row.vendorCode,
       vendorName: row.vendorName,
+      materialKind: row.materialKind,
       version: row.version,
       status: row.status as ShiftReportStatus,
       am: fleet('am', row),
@@ -201,6 +204,7 @@ export function createVendorOperationRepository(db: PostgresJsDatabase<typeof Sc
         await tx.insert(loadingAssignmentAas).values(assignment.aaIds.map(aaId=>({
           assignmentId: created.id,
           aaId,
+          materialKind: assignment.materialKind,
           validFrom: assignment.validFrom,
           validTo: assignment.validTo,
           active: true,
@@ -209,12 +213,13 @@ export function createVendorOperationRepository(db: PostgresJsDatabase<typeof Sc
     }
   }
 
-  async function findIdByStatus(input: {vendorId:string;operationDate:string;shiftCode:string;status:'DRAFT'|'SUBMITTED'}) {
+  async function findIdByStatus(input: {vendorId:string;operationDate:string;shiftCode:string;materialKind:'LS'|'CL';status:'DRAFT'|'SUBMITTED'}) {
     const [row] = await db.select({ id: vendorShiftReports.id }).from(vendorShiftReports)
       .where(and(
         eq(vendorShiftReports.vendorId,input.vendorId),
         eq(vendorShiftReports.operationDate,input.operationDate),
         eq(vendorShiftReports.shiftCode,input.shiftCode),
+        eq(vendorShiftReports.materialKind,input.materialKind),
         eq(vendorShiftReports.status,input.status),
       )).orderBy(desc(vendorShiftReports.version)).limit(1);
     return row?.id ?? null;
@@ -241,6 +246,7 @@ export function createVendorOperationRepository(db: PostgresJsDatabase<typeof Sc
         filter.operationDate ? eq(vendorShiftReports.operationDate, filter.operationDate) : undefined,
         filter.shiftCode ? eq(vendorShiftReports.shiftCode, filter.shiftCode) : undefined,
         filter.status ? eq(vendorShiftReports.status, filter.status) : undefined,
+        filter.materialKind ? eq(vendorShiftReports.materialKind,filter.materialKind) : undefined,
       );
       const [ids,totalRows] = await Promise.all([
         db.select({id:vendorShiftReports.id}).from(vendorShiftReports).where(where)
@@ -256,7 +262,7 @@ export function createVendorOperationRepository(db: PostgresJsDatabase<typeof Sc
       const reportId = await db.transaction(async tx => {
         const [maxRow] = await tx.select({ maxVersion: sql<number>`coalesce(max(${vendorShiftReports.version}),0)` })
           .from(vendorShiftReports)
-          .where(and(eq(vendorShiftReports.vendorId,input.vendorId),eq(vendorShiftReports.operationDate,input.operationDate),eq(vendorShiftReports.shiftCode,input.shiftCode)));
+          .where(and(eq(vendorShiftReports.vendorId,input.vendorId),eq(vendorShiftReports.operationDate,input.operationDate),eq(vendorShiftReports.shiftCode,input.shiftCode),eq(vendorShiftReports.materialKind,input.materialKind)));
         const version = Number(maxRow?.maxVersion ?? 0) + 1;
         const [created] = await tx.insert(vendorShiftReports).values({
           ...reportValues(input,actorUserId),
@@ -278,7 +284,7 @@ export function createVendorOperationRepository(db: PostgresJsDatabase<typeof Sc
 
     async replaceDraft(reportId, input, actorUserId) {
       await db.transaction(async tx => {
-        const locked = await tx.execute(sql`SELECT id,status,operation_date,shift_code,vendor_id FROM vendor_shift_reports WHERE id=${reportId}::uuid FOR UPDATE`);
+        const locked = await tx.execute(sql`SELECT id,status,operation_date,shift_code,vendor_id,material_kind FROM vendor_shift_reports WHERE id=${reportId}::uuid FOR UPDATE`);
         const row = (locked as unknown as Array<any>)[0];
         if (!row || row.status !== 'DRAFT') throw new Error('Hanya report DRAFT yang dapat diubah.');
         await tx.update(vendorShiftReports).set({
@@ -288,7 +294,7 @@ export function createVendorOperationRepository(db: PostgresJsDatabase<typeof Sc
         }).where(eq(vendorShiftReports.id,reportId));
         await tx.delete(loadingAssignments).where(eq(loadingAssignments.reportId,reportId));
         await insertAssignments(tx,reportId,{
-          operationDate:String(row.operation_date),shiftCode:String(row.shift_code) as any,vendorId:String(row.vendor_id),
+          operationDate:String(row.operation_date),shiftCode:String(row.shift_code) as any,vendorId:String(row.vendor_id),materialKind:String(row.material_kind) as 'LS'|'CL',
           ...input,
         },actorUserId);
       });
@@ -299,7 +305,7 @@ export function createVendorOperationRepository(db: PostgresJsDatabase<typeof Sc
 
     async submit(reportId, actorUserId) {
       await db.transaction(async tx => {
-        const locked = await tx.execute(sql`SELECT id,status,operation_date,shift_code,vendor_id FROM vendor_shift_reports WHERE id=${reportId}::uuid FOR UPDATE`);
+        const locked = await tx.execute(sql`SELECT id,status,operation_date,shift_code,vendor_id,material_kind FROM vendor_shift_reports WHERE id=${reportId}::uuid FOR UPDATE`);
         const row = (locked as unknown as Array<any>)[0];
         if (!row || row.status !== 'DRAFT') throw new Error('Hanya report DRAFT yang dapat disubmit.');
         const now = new Date();
@@ -308,6 +314,7 @@ export function createVendorOperationRepository(db: PostgresJsDatabase<typeof Sc
             eq(vendorShiftReports.vendorId,String(row.vendor_id)),
             eq(vendorShiftReports.operationDate,String(row.operation_date)),
             eq(vendorShiftReports.shiftCode,String(row.shift_code)),
+            eq(vendorShiftReports.materialKind,String(row.material_kind) as 'LS'|'CL'),
             eq(vendorShiftReports.status,'SUBMITTED'),
             ne(vendorShiftReports.id,reportId),
           ));
@@ -325,14 +332,14 @@ export function createVendorOperationRepository(db: PostgresJsDatabase<typeof Sc
         const old = (locked as unknown as Array<any>)[0];
         if (!old || old.status !== 'SUBMITTED') throw new Error('Revision hanya dapat dibuat dari report SUBMITTED aktif.');
         const [existingDraft] = await tx.select({id:vendorShiftReports.id}).from(vendorShiftReports).where(and(
-          eq(vendorShiftReports.vendorId,String(old.vendor_id)),eq(vendorShiftReports.operationDate,String(old.operation_date)),eq(vendorShiftReports.shiftCode,String(old.shift_code)),eq(vendorShiftReports.status,'DRAFT'),
+          eq(vendorShiftReports.vendorId,String(old.vendor_id)),eq(vendorShiftReports.operationDate,String(old.operation_date)),eq(vendorShiftReports.shiftCode,String(old.shift_code)),eq(vendorShiftReports.materialKind,String(old.material_kind) as 'LS'|'CL'),eq(vendorShiftReports.status,'DRAFT'),
         )).limit(1);
         if (existingDraft) throw new Error('Sudah ada draft revision untuk vendor/tanggal/shift ini.');
 
         const [maxRow] = await tx.select({ maxVersion: sql<number>`coalesce(max(${vendorShiftReports.version}),0)` }).from(vendorShiftReports)
-          .where(and(eq(vendorShiftReports.vendorId,String(old.vendor_id)),eq(vendorShiftReports.operationDate,String(old.operation_date)),eq(vendorShiftReports.shiftCode,String(old.shift_code))));
+          .where(and(eq(vendorShiftReports.vendorId,String(old.vendor_id)),eq(vendorShiftReports.operationDate,String(old.operation_date)),eq(vendorShiftReports.shiftCode,String(old.shift_code)),eq(vendorShiftReports.materialKind,String(old.material_kind) as 'LS'|'CL')));
         const [created] = await tx.insert(vendorShiftReports).values({
-          operationDate:String(old.operation_date),shiftCode:String(old.shift_code),vendorId:String(old.vendor_id),version:Number(maxRow?.maxVersion??old.version)+1,status:'DRAFT',
+          operationDate:String(old.operation_date),shiftCode:String(old.shift_code),vendorId:String(old.vendor_id),materialKind:String(old.material_kind) as 'LS'|'CL',version:Number(maxRow?.maxVersion??old.version)+1,status:'DRAFT',
           amTotal:Number(old.am_total),amOperating:Number(old.am_operating),amStandby:Number(old.am_standby),amBreakdown:Number(old.am_breakdown),amRepair:Number(old.am_repair),amOther:Number(old.am_other),
           aaTotal:Number(old.aa_total),aaOperating:Number(old.aa_operating),aaStandby:Number(old.aa_standby),aaBreakdown:Number(old.aa_breakdown),aaRepair:Number(old.aa_repair),aaOther:Number(old.aa_other),
           note:old.note ? String(old.note) : null,revisionReason:reason,revisesReportId:reportId,createdBy:actorUserId,updatedBy:actorUserId,
@@ -348,7 +355,7 @@ export function createVendorOperationRepository(db: PostgresJsDatabase<typeof Sc
           }).returning({id:loadingAssignments.id});
           if(!copy)throw new Error('Gagal menyalin assignment revision.');
           const aas=await tx.select().from(loadingAssignmentAas).where(and(eq(loadingAssignmentAas.assignmentId,a.id),eq(loadingAssignmentAas.active,true)));
-          if(aas.length)await tx.insert(loadingAssignmentAas).values(aas.map(x=>({assignmentId:copy.id,aaId:x.aaId,validFrom:x.validFrom,validTo:x.validTo,active:true,note:x.note})));
+          if(aas.length)await tx.insert(loadingAssignmentAas).values(aas.map(x=>({assignmentId:copy.id,aaId:x.aaId,materialKind:a.materialKind,validFrom:x.validFrom,validTo:x.validTo,active:true,note:x.note})));
         }
         return created.id;
       });

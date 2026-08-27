@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 import type { RetaseEvent, ShiftCode } from '@qc/contracts';
 import { authQueryOptions } from '../../features/auth/auth-query';
-import { masterLookups } from '../../features/qc/qc-api';
+import { useMaterialLookups } from '../../features/navigation/material-context';
 import { getCounterAssignments, getCounterContext, getRetaseSummary, listRetaseEvents, recordRetase, reverseRetase } from '../../features/retase/retase-api';
 import { Modal } from '../../components/modal';
 
-export const Route=createFileRoute('/_authenticated/retase-counter')({component:RetaseCounterPage});
+export const Route=createFileRoute('/_authenticated/retase-counter')({beforeLoad:({search})=>{if(search.material==='CL')throw redirect({to:'/clay-report',search:{material:'CL'}})},component:RetaseCounterPage});
 
 function fmtTime(value:string|null){if(!value)return '—';return new Date(value).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
 function contextKey(crusherId:string,operationDate:string,shiftCode:ShiftCode){return {crusherId,operationDate,shiftCode};}
@@ -15,7 +15,7 @@ function contextKey(crusherId:string,operationDate:string,shiftCode:ShiftCode){r
 function RetaseCounterPage(){
   const qc=useQueryClient();
   const auth=useQuery(authQueryOptions);const user=auth.data?.user;
-  const lookups=useQuery({queryKey:['lookups','master'],queryFn:masterLookups,staleTime:5*60_000});
+  const lookups=useMaterialLookups();
   const allowedCrushers=useMemo(()=>{
     const all=(lookups.data?.crushers??[]).filter(x=>x.active);
     if(user?.role==='CRUSHER_OPERATOR')return all.filter(x=>user.crusherIds.includes(x.id));
@@ -76,7 +76,7 @@ function RetaseCounterPage(){
 
   const s=summary.data?.summary;const vendors=lookups.data?.vendors??[];
   return <section className="page-stack retase-counter-page">
-    <div className="page-heading"><div><p className="eyebrow">SLICE 05 / CRUSHER OPERATION</p><h1>Digital Retase Counter</h1><p>Assignment berasal dari Shift Report atau konfigurasi Operational/Clay. Satu AM dapat melayani beberapa route crusher.</p></div><span className={`status-badge ${context.data?.canRecord?'success':'warning'}`}>{context.data?.canRecord?'LIVE':'READ ONLY'}</span></div>
+    <div className="page-heading"><div><p className="eyebrow">LIMESTONE / OPERASI CRUSHER</p><h1>Digital Retase Counter</h1><p>Catat setiap perjalanan armada Limestone. Pilih crusher dan gunakan kartu AA untuk menambah retase.</p></div><span className={`status-badge ${context.data?.canRecord?'success':'warning'}`}>{context.data?.canRecord?'LIVE':'READ ONLY'}</span></div>
 
     <div className="card counter-context-grid">
       <label><span>Crusher</span><select value={crusherId} onChange={e=>setCrusherId(e.target.value)}><option value="">— pilih crusher —</option>{allowedCrushers.map(c=><option key={c.id} value={c.id}>{c.label} · {c.materialKind}</option>)}</select></label>
@@ -103,7 +103,7 @@ function RetaseCounterPage(){
         <header><div><strong>{a.vendorName} · AM {a.amUnitNo}</strong><small>{a.blockSnapshot??a.sourceName??'Clay direct'} · {a.materialCategory} · {a.crusherName}{a.plantName?` / ${a.plantName}`:''}{a.pileName?` / ${a.pileName}`:''}{a.validFrom&&a.validTo?` · ${a.validFrom}–${a.validTo}`:''}</small></div><div className="inline-actions"><span className={`status-badge ${a.assignmentOrigin==='OPERATIONAL'?'warning':'muted'}`}>{a.assignmentOrigin}</span><span className={`status-badge ${a.activeNow?'success':'muted'}`}>{a.activeNow?'ACTIVE NOW':'OUTSIDE WINDOW'}</span></div></header>
         <div className="aa-counter-grid">{a.aa.map(aa=>{const p=pending[aa.assignmentAaId]??0;const display=aa.confirmedCount+p;const err=failed[aa.assignmentAaId];return <button key={aa.assignmentAaId} type="button" className={`aa-counter-card ${p?'pending':''} ${err?'failed':''}`} disabled={!context.data?.canRecord||!a.activeNow||p>0} onClick={()=>void tapAa(aa.assignmentAaId)}><span className="aa-no">AA {aa.unitNo}</span><strong>{display}</strong><small>{p?'PENDING SYNC':err?'FAILED · tap retry same request' :aa.lastEventAt?`Last ${fmtTime(aa.lastEventAt)}`:'Belum dump'}</small></button>})}</div>
       </article>)}
-      {!assignments.isFetching&&!assignments.data?.items.length&&<div className="card counter-empty"><strong>Belum ada assignment aktif.</strong><span>Submit Vendor Shift Report atau buat Operational/Clay Assignment untuk Operation Date, Shift, dan Crusher ini.</span></div>}
+      {!assignments.isFetching&&!assignments.data?.items.length&&<div className="card counter-empty"><strong>Belum ada assignment aktif.</strong><span>Submit Laporan Shift Vendor atau buat Penugasan Operasional Limestone untuk Operation Date, Shift, dan Crusher ini.</span></div>}
     </div>
 
     <div className="counter-bottom-grid">

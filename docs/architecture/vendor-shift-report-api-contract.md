@@ -8,6 +8,7 @@ Query:
 
 - `operationDate=YYYY-MM-DD`
 - `shiftCode=SHIFT_1|SHIFT_2|SHIFT_3`
+- `materialKind=LS|CL` (default `LS` untuk client lama)
 - `vendorId=<uuid>` required for non-VENDOR users
 
 Returns current editable draft if present; otherwise effective submitted report.
@@ -24,6 +25,7 @@ Filters:
 - operationDate
 - shiftCode
 - status
+- materialKind
 - limit
 - offset
 
@@ -44,6 +46,7 @@ Payload:
   "vendorId": "uuid",
   "operationDate": "2026-08-20",
   "shiftCode": "SHIFT_1",
+  "materialKind": "LS",
   "am": {"total":4,"operating":2,"standby":1,"breakdown":1,"repair":0,"other":0},
   "aa": {"total":18,"operating":13,"standby":1,"breakdown":0,"repair":4,"other":0},
   "note": null,
@@ -62,11 +65,11 @@ Payload:
 }
 ```
 
-Material kind and category are server-derived from Source Master.
+Material category is server-derived from Source Master. Every assignment Source/Crusher/Pile/AM/AA must match the report `materialKind`. Vendor Shift Report is optional in the independent Clay workflow.
 
 ## PUT `/vendor/shift-reports/:id/draft`
 
-Updates an existing DRAFT. Operation Date, Shift and Vendor are immutable within the draft version. Assignment rows are replaced transactionally.
+Updates an existing DRAFT. Operation Date, Shift, Material Kind, and Vendor are immutable within the draft version. Assignment rows are replaced transactionally.
 
 ## POST `/vendor/shift-reports/:id/submit`
 

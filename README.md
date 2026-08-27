@@ -2,7 +2,7 @@
 
 Full native web replacement untuk QC Raw Material yang sebelumnya berjalan pada Google Apps Script/Google Sheets.
 
-**Current implementation:** `v0.7.0` — Foundation + Slice 01 IAM/Auth + Slice 02 Master Data + Slice 03 QC Core Parity + Slice 04 Vendor Shift Report + Slice 05 Digital Retase Counter + Slice 06 QC Reconciliation & Retase Mapping.
+**Current implementation:** `v0.7.0` + Clay workflow hardening — Foundation + Slice 01 IAM/Auth + Slice 02 Master Data + Slice 03 QC Core Parity + Slice 04 Vendor Shift Report + Slice 05 Digital Retase Counter + Slice 06 QC Reconciliation & Retase Mapping + independent Clay Shift Report.
 
 ## Target architecture
 
@@ -151,6 +151,38 @@ API contract: `docs/architecture/retase-counter-api-contract.md`.
 Detailed implementation: `docs/architecture/slice-06-qc-reconciliation-retase-mapping.md`.
 API contract: `docs/architecture/reconciliation-api-contract.md`.
 Migration: `packages/db/migrations/0006_qc_reconciliation_retase_mapping.sql`.
+
+### Clay Shift Report + Material-Scoped Masters
+
+- laporan utama Clay berdasarkan tanggal + shift + Clay Crusher, tidak bergantung pada Vendor Shift Report;
+- Vendor Shift Report Clay tersedia sebagai input helper opsional;
+- kolom dua baris dinamis dengan Vendor/Source/Pile master opsional atau snapshot manual;
+- operator membuat kolom provisional dan mencatat retase live langsung ke kolom;
+- QC mengonfirmasi kolom, mengelola header/KPI, backfill jam, log operasi, dan submit;
+- Supervisor/Admin approve atau controlled reopen;
+- master Vendor, Equipment, dan Plant mempunyai scope LS/CL terpisah;
+- Source, Crusher, dan Pile divalidasi terhadap satu material kind;
+- migrations `0014_material_master_scopes.sql` dan `0015_clay_shift_report.sql`.
+
+Detailed implementation: `docs/architecture/clay-shift-report-workflow.md`.
+Architecture decision: `docs/adr/013-clay-report-independent-aggregate.md`.
+
+**Clay langsung ke Mixing Workbench (2026-08-27):** laporan crusher/counter tersimpan + sampel laboratorium → mixing, tanpa Rekonsiliasi Retase. Di `/qc-workbench?material=CL`, pilih tanggal/shift; retase per kolom laporan tampil otomatis, termasuk header manual TOP/BONTOA atau BUFFER/TRASS. Pada baris sampel lab, pilih kolom sumber dan jumlah yang dipakai, kemudian Save Mix. Beberapa kolom dapat digabung pada satu sampel atau dibagi ke beberapa sampel. Tidak ada pencocokan otomatis berdasarkan nama/vendor yang ambigu.
+
+Migrasi `0017_clay_direct_mixing.sql` menyimpan pemakaian per kolom/mix item, mencegah pemakaian berlebih, dan mengembalikan jatah lama secara atomik saat Replace Mix. Retase draft tersimpan tersedia bila kolom `CONFIRMED`; input crusher yang belum disimpan tidak tersedia. Koreksi negatif tidak boleh mengurangi total laporan di bawah pemakaian mixing. Rekonsiliasi Limestone tetap berlaku. Detail: `docs/adr/014-clay-direct-mixing.md`.
+
+UI `/clay-report` mengikuti form laporan kertas melalui tiga tab: **Ringkasan**, **Distribusi Material**, dan **Gangguan & Catatan**. Ringkasan tersimpan otomatis; perubahan trip per jam dan gangguan baru dikirim melalui **Simpan Draft**. QC/Supervisor dapat menambah atau mengurangi trip di matriks (koreksi wajib alasan), sedangkan operator mencatat trip live pada jam aktif. Header kolom bisa dipilih dari master Clay atau ditulis manual melalui **Tambah material**.
+
+Database memerlukan hotfix `0016_clay_retase_event_constraints.sql` agar retase Clay tanpa AA dan koreksi negatif dapat disimpan. Migrasi ini sudah diterapkan ke Supabase staging pada 2026-08-27. Jika menerima error integritas pada draft yang masih terbuka sebelum hotfix, tekan **Simpan Draft** lagi tanpa refresh agar delta lokal tidak hilang. Uji PostgreSQL rollback-only tersedia pada `pnpm --filter @qc/db test:clay-db`; konfigurasi target dijelaskan di `packages/db/migrations/README.md`.
+
+Total trip, sumber dominan, dan downtime dihitung otomatis. Running time aktual tetap dicatat terpisah dari estimasi jadwal; stok gudang menggunakan persen. Submit mengunci laporan untuk pemeriksaan Supervisor. Redesign ini tidak memerlukan migrasi tambahan. Detail perubahan dan verifikasi: `CLAY_WORKFLOW_CHANGELOG.md`.
+Change log: `CLAY_WORKFLOW_CHANGELOG.md`.
+
+## Material workspace UI
+
+Navigasi fitur menggunakan collapsible sidebar dengan kelompok Limestone dan Clay yang terpisah. Konteks material mengikuti URL (misalnya `/qc-workbench?material=CL`) dan diterapkan pada sampel, lookup, penugasan, laporan, dan gudang. Dashboard, sign-in, formulir, serta tabel menggunakan desain workspace baru yang responsif. Master Data dan manajemen akun tetap dikelola bersama.
+
+Redesign ini menggunakan migrasi existing 0014–0016 tanpa perubahan schema tambahan. Detail implementasi dan pengujian: [UI_WORKSPACE_REDESIGN.md](UI_WORKSPACE_REDESIGN.md).
 
 ## First local bootstrap
 
