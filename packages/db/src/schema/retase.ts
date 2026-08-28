@@ -77,7 +77,7 @@ export const qcRetaseAllocations = pgTable('qc_retase_allocations', {
   id: uuid('id').primaryKey().defaultRandom(),
   operationDate: date('operation_date').notNull(),
   shiftCode: text('shift_code').notNull(),
-  crusherId: uuid('crusher_id').notNull().references(() => crushers.id, { onDelete: 'restrict' }),
+  crusherId: uuid('crusher_id').references(() => crushers.id, { onDelete: 'restrict' }),
   vendorId: uuid('vendor_id').notNull().references(() => vendors.id, { onDelete: 'restrict' }),
   assignmentId: uuid('assignment_id').notNull().references(() => loadingAssignments.id, { onDelete: 'restrict' }),
   sampleId: uuid('sample_id').references(() => rawSamples.id, { onDelete: 'restrict' }),

@@ -5,7 +5,7 @@ import { apiFetch } from '../../lib/api-client';
 
 export interface ShiftReportResponse { ok:true; item:ShiftReport|null }
 export interface ShiftReportListResponse { ok:true; items:ShiftReport[]; total:number }
-export interface EquipmentLookupItem { id:string; code:string; label:string; active:boolean; vendorId:string; type:'AM'|'AA'; unitNo:string }
+export interface EquipmentLookupItem { id:string; code:string; label:string; active:boolean; vendorId:string; type:'AM'|'AA'; unitNo:string; aliases?:string[] }
 
 function qs(input:Record<string,string|number|undefined>){
   const s=new URLSearchParams();

@@ -11,7 +11,7 @@ export interface CounterLookup {
 export interface RetaseEventRepository {
   listCounterAssignments(input:CounterLookup):Promise<CounterAssignmentRecord[]>;
   listAssignmentCandidatesForAa(input:CounterLookup & {aaId:string}):Promise<AssignmentAaResolutionRecord[]>;
-  getAssignmentAaById(assignmentAaId:string):Promise<AssignmentAaResolutionRecord|null>;
+  getAssignmentAaById(assignmentAaId:string,crusherId:string):Promise<AssignmentAaResolutionRecord|null>;
   getClayCounterColumn(columnId:string):Promise<ClayCounterColumnRecord|null>;
   findByRequestId(requestId:string):Promise<RetaseEventRecord|null>;
   getEventById(id:string):Promise<RetaseEventRecord|null>;

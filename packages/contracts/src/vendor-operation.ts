@@ -23,7 +23,7 @@ export const ShiftAssignmentInputSchema = z.object({
   id: z.string().uuid().optional(),
   amId: z.string().uuid(),
   sourceId: z.string().uuid(),
-  crusherId: z.string().uuid(),
+  crusherId: z.string().uuid().nullable().optional(),
   pileId: z.string().uuid().nullable().optional(),
   blockSnapshot: z.string().trim().max(160).nullable().optional(),
   validFrom: TimeSchema.nullable().optional(),
@@ -31,6 +31,7 @@ export const ShiftAssignmentInputSchema = z.object({
   aaIds: z.array(z.string().uuid()).max(100).default([]),
   note: NullableText,
 }).superRefine((value, ctx) => {
+  if (value.pileId && !value.crusherId) ctx.addIssue({ code: 'custom', path: ['pileId'], message: 'Pilih crusher sebelum menentukan pile tujuan.' });
   const hasFrom = !!value.validFrom;
   const hasTo = !!value.validTo;
   if (hasFrom !== hasTo) ctx.addIssue({ code: 'custom', path: ['validFrom'], message: 'Start dan End Time harus diisi berpasangan.' });
@@ -45,7 +46,8 @@ export const ShiftReportDraftInputSchema = z.object({
   materialKind: MaterialKindSchema.default('LS'),
   am: FleetSummarySchema,
   aa: FleetSummarySchema,
-  note: NullableText,
+  // Preserve original WhatsApp text with the reviewed report and its audit history.
+  note: z.string().trim().max(20_000).nullable().optional(),
   assignments: z.array(ShiftAssignmentInputSchema).max(100).default([]),
 });
 
@@ -87,9 +89,9 @@ export const ShiftAssignmentSchema = z.object({
   blockSnapshot: z.string().nullable(),
   materialCategory: z.string(),
   materialKind: z.enum(['LS','CL']),
-  crusherId: z.string().uuid(),
-  crusherCode: z.string(),
-  crusherName: z.string(),
+  crusherId: z.string().uuid().nullable(),
+  crusherCode: z.string().nullable(),
+  crusherName: z.string().nullable(),
   pileId: z.string().uuid().nullable(),
   pileCode: z.string().nullable(),
   pileName: z.string().nullable(),

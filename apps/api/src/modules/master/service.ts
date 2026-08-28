@@ -325,7 +325,7 @@ export function createMasterService(repository: MasterRepository) {
         ? crusherResult.items.filter((c) => principal.crusherIds.includes(c.id))
         : crusherResult.items;
       return {
-        vendors: vendors.map((v) => ({ id: v.id, code: v.code, label: v.name, active: v.active, materialKinds: v.materialKinds })),
+        vendors: vendors.map((v) => ({ id: v.id, code: v.code, label: v.name, active: v.active, materialKinds: v.materialKinds, aliases: v.aliases })),
         plants: plantsResult.items.map((v) => ({ id: v.id, code: v.code, label: v.name, active: v.active, materialKinds: v.materialKinds })),
         crushers: crusherItems.map((v) => ({ id: v.id, code: v.code, label: v.name, active: v.active, materialKind: v.materialKind, plantId: v.plantId })),
         sources: sourceResult.items.map((v) => ({ id: v.id, code: v.code, label: v.name, active: v.active, materialKind: v.materialKind, materialCategory: v.materialCategory, block: v.block })),
@@ -339,7 +339,7 @@ export function createMasterService(repository: MasterRepository) {
       let effectiveVendorId = vendorId;
       if (principal.role === 'VENDOR') effectiveVendorId = principal.vendorId ?? undefined;
       const result = await repository.listEquipment({ active: true, limit: 250, offset: 0, ...(effectiveVendorId ? { vendorId: effectiveVendorId } : {}), ...(type ? { type } : {}), ...(materialKind ? { materialKind } : {}) });
-      return result.items.map((v) => ({ id: v.id, code: `${v.vendorCode}:${v.type}:${v.unitNo}`, label: `${v.unitNo}${v.brand ? ` · ${v.brand}` : ''}`, active: v.active, vendorId: v.vendorId, type: v.type, unitNo: v.unitNo, materialKinds: v.materialKinds }));
+      return result.items.map((v) => ({ id: v.id, code: `${v.vendorCode}:${v.type}:${v.unitNo}`, label: `${v.unitNo}${v.brand ? ` · ${v.brand}` : ''}`, active: v.active, vendorId: v.vendorId, type: v.type, unitNo: v.unitNo, materialKinds: v.materialKinds, aliases: v.aliases }));
     },
   };
 }

@@ -4,7 +4,7 @@ import type { ShiftRecord } from '../master/types';
 export interface TimelineAssignment {
   amId: string;
   aaIds: string[];
-  crusherId?: string | undefined;
+  crusherId?: string | null | undefined;
   validFrom: string | null;
   validTo: string | null;
 }

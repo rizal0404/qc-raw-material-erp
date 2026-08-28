@@ -26,7 +26,7 @@ export function createVendorOperationService(repository: VendorShiftReportReposi
   }
 
   function assertWriteRole(principal: AuthPrincipal) {
-    if (!['VENDOR','SUPERVISOR_ADMIN'].includes(principal.role)) throw forbidden('Role ini hanya dapat melihat shift report.');
+    if (!['VENDOR','QC_ANALYST','SUPERVISOR_ADMIN'].includes(principal.role)) throw forbidden('Role ini hanya dapat melihat shift report.');
   }
 
   async function shiftRecord(shiftCode: ShiftCode) {
@@ -49,7 +49,7 @@ export function createVendorOperationService(repository: VendorShiftReportReposi
     for(let index=0;index<assignments.length;index+=1){
       const a=assignments[index]!;
       const [am,source,crusher,pile]=await Promise.all([
-        master.findEquipmentById(a.amId),master.findSourceById(a.sourceId),master.findCrusherById(a.crusherId),a.pileId?master.findPileById(a.pileId):Promise.resolve(null),
+        master.findEquipmentById(a.amId),master.findSourceById(a.sourceId),a.crusherId?master.findCrusherById(a.crusherId):Promise.resolve(null),a.pileId?master.findPileById(a.pileId):Promise.resolve(null),
       ]);
       if(!am||am.type!=='AM')throw new AppError(400,'INVALID_AM',`Assignment #${index+1}: AM tidak valid.`);
       if(am.vendorId!==vendorId)throw new AppError(400,'EQUIPMENT_VENDOR_MISMATCH',`Assignment #${index+1}: AM bukan milik vendor report.`);
@@ -58,12 +58,13 @@ export function createVendorOperationService(repository: VendorShiftReportReposi
       if(!source)throw new AppError(400,'INVALID_SOURCE',`Assignment #${index+1}: Source tidak ditemukan.`);
       if(!source.active)throw new AppError(400,'INACTIVE_REFERENCE',`Assignment #${index+1}: Source ${source.name} sedang INACTIVE.`);
       if(source.materialKind!==materialKind)throw new AppError(400,'MATERIAL_SCOPE_MISMATCH',`Assignment #${index+1}: Source bukan master ${materialKind}.`);
-      if(!crusher)throw new AppError(400,'INVALID_CRUSHER',`Assignment #${index+1}: Crusher tidak ditemukan.`);
-      if(!crusher.active)throw new AppError(400,'INACTIVE_REFERENCE',`Assignment #${index+1}: Crusher ${crusher.name} sedang INACTIVE.`);
-      if(crusher.materialKind!==source.materialKind)throw new AppError(400,'MATERIAL_CRUSHER_MISMATCH',`Assignment #${index+1}: material ${source.materialKind} tidak sesuai crusher ${crusher.name}.`);
+      if(a.crusherId&&!crusher)throw new AppError(400,'INVALID_CRUSHER',`Assignment #${index+1}: Crusher tidak ditemukan.`);
+      if(crusher&&!crusher.active)throw new AppError(400,'INACTIVE_REFERENCE',`Assignment #${index+1}: Crusher ${crusher.name} sedang INACTIVE.`);
+      if(crusher&&crusher.materialKind!==source.materialKind)throw new AppError(400,'MATERIAL_CRUSHER_MISMATCH',`Assignment #${index+1}: material ${source.materialKind} tidak sesuai crusher ${crusher.name}.`);
+      if(a.pileId&&!a.crusherId)throw new AppError(400,'PILE_REQUIRES_CRUSHER','Pile tujuan memerlukan crusher yang spesifik.');
       if(a.pileId&&!pile)throw new AppError(400,'INVALID_PILE',`Assignment #${index+1}: Pile tidak ditemukan.`);
       if(pile&&(!pile.active||pile.materialKind!==source.materialKind))throw new AppError(400,'PILE_MATERIAL_MISMATCH',`Assignment #${index+1}: Pile tidak aktif atau berbeda material.`);
-      if(pile&&pile.plantId&&crusher.plantId&&pile.plantId!==crusher.plantId)throw new AppError(400,'PILE_PLANT_MISMATCH',`Assignment #${index+1}: Pile dan crusher berada pada plant berbeda.`);
+      if(pile&&crusher&&pile.plantId&&crusher.plantId&&pile.plantId!==crusher.plantId)throw new AppError(400,'PILE_PLANT_MISMATCH',`Assignment #${index+1}: Pile dan crusher berada pada plant berbeda.`);
 
       const aaIds=Array.from(new Set(a.aaIds));
       for(const aaId of aaIds){
@@ -81,7 +82,7 @@ export function createVendorOperationService(repository: VendorShiftReportReposi
         blockSnapshot:clean(a.blockSnapshot) ?? source.block,
         materialCategory:source.materialCategory,
         materialKind:source.materialKind,
-        crusherId:a.crusherId,
+        crusherId:a.crusherId??null,
         pileId:a.pileId ?? null,
         validFrom:a.validFrom ?? null,
         validTo:a.validTo ?? null,

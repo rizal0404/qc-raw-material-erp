@@ -157,7 +157,7 @@ export const MasterListResponseSchema = <T extends z.ZodTypeAny>(itemSchema: T) 
 export const MasterMutationResponseSchema = <T extends z.ZodTypeAny>(itemSchema: T) => z.object({ ok: z.literal(true), item: itemSchema });
 
 export const LookupOptionSchema = z.object({ id: z.string(), code: z.string(), label: z.string(), active: z.boolean() });
-export const ScopedLookupOptionSchema = LookupOptionSchema.extend({ materialKinds: z.array(MaterialKindSchema) });
+export const ScopedLookupOptionSchema = LookupOptionSchema.extend({ materialKinds: z.array(MaterialKindSchema), aliases: z.array(z.string()).optional() });
 export const EquipmentLookupOptionSchema = ScopedLookupOptionSchema.extend({ vendorId: z.string().uuid(), type: EquipmentTypeSchema, unitNo: z.string() });
 export const CrusherLookupOptionSchema = LookupOptionSchema.extend({ materialKind: MaterialKindSchema, plantId: z.string().uuid().nullable() });
 export const SourceLookupOptionSchema = LookupOptionSchema.extend({ materialKind: MaterialKindSchema, materialCategory: z.string(), block: z.string().nullable() });

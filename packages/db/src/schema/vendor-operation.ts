@@ -1,4 +1,5 @@
-import { boolean, date, index, integer, pgTable, text, time, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { boolean, check, date, index, integer, pgTable, text, time, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { materialKindEnum, reportStatusEnum, assignmentStatusEnum } from './enums';
 import { users, vendors } from './iam';
 import { crushers, equipment, piles, shifts, sources } from './master';
@@ -52,7 +53,7 @@ export const loadingAssignments = pgTable('loading_assignments', {
   blockSnapshot: text('block_snapshot'),
   materialCategory: text('material_category').notNull(),
   materialKind: materialKindEnum('material_kind').notNull(),
-  crusherId: uuid('crusher_id').notNull().references(() => crushers.id, { onDelete: 'restrict' }),
+  crusherId: uuid('crusher_id').references(() => crushers.id, { onDelete: 'restrict' }),
   pileId: uuid('pile_id').references(() => piles.id, { onDelete: 'restrict' }),
   validFrom: time('valid_from'),
   validTo: time('valid_to'),
@@ -63,6 +64,7 @@ export const loadingAssignments = pgTable('loading_assignments', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
+  check('loading_assignment_destination_ck', sql`${t.crusherId} IS NOT NULL OR (${t.assignmentOrigin} = 'SHIFT_REPORT' AND ${t.pileId} IS NULL)`),
   uniqueIndex('loading_assignments_id_kind_uq').on(t.id,t.materialKind),
   index('loading_assignment_report_idx').on(t.reportId),
   index('loading_assignment_counter_idx').on(t.operationDate, t.shiftCode, t.crusherId, t.status),

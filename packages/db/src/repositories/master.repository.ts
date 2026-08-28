@@ -1,4 +1,4 @@
-import { and, asc, count, eq, ilike, or, sql } from 'drizzle-orm';
+import { and, asc, count, eq, ilike, notInArray, or, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
@@ -127,8 +127,10 @@ export function createMasterRepository(db: PostgresJsDatabase<typeof Schema>): M
           if (patch.aliases.length) await tx.insert(vendorAliases).values(patch.aliases.map((alias) => ({ vendorId: id, alias, normalizedAlias: normalizeAlias(alias) })));
         }
         if (materialKinds !== undefined) {
-          await tx.delete(vendorMaterialScopes).where(eq(vendorMaterialScopes.vendorId, id));
-          await tx.insert(vendorMaterialScopes).values(materialKinds.map((materialKind) => ({ vendorId: id, materialKind })));
+          // Retained scopes may already be referenced by reports/retase. Never delete them.
+          await tx.delete(vendorMaterialScopes).where(and(eq(vendorMaterialScopes.vendorId, id), notInArray(vendorMaterialScopes.materialKind, materialKinds)));
+          await tx.insert(vendorMaterialScopes).values(materialKinds.map((materialKind) => ({ vendorId: id, materialKind })))
+            .onConflictDoUpdate({ target: [vendorMaterialScopes.vendorId, vendorMaterialScopes.materialKind], set: { active: true } });
         }
         return row.id;
       });
@@ -171,8 +173,10 @@ export function createMasterRepository(db: PostgresJsDatabase<typeof Schema>): M
         const [row] = await tx.update(plants).set({ ...plantPatch, updatedAt: new Date() }).where(eq(plants.id, id)).returning({ id: plants.id });
         if (!row) return null;
         if (materialKinds !== undefined) {
-          await tx.delete(plantMaterialScopes).where(eq(plantMaterialScopes.plantId, id));
-          await tx.insert(plantMaterialScopes).values(materialKinds.map((materialKind) => ({ plantId: id, materialKind })));
+          // Retained scopes may already be referenced by reports/retase. Never delete them.
+          await tx.delete(plantMaterialScopes).where(and(eq(plantMaterialScopes.plantId, id), notInArray(plantMaterialScopes.materialKind, materialKinds)));
+          await tx.insert(plantMaterialScopes).values(materialKinds.map((materialKind) => ({ plantId: id, materialKind })))
+            .onConflictDoUpdate({ target: [plantMaterialScopes.plantId, plantMaterialScopes.materialKind], set: { active: true } });
         }
         return row.id;
       });
@@ -250,8 +254,10 @@ export function createMasterRepository(db: PostgresJsDatabase<typeof Schema>): M
         const [row] = await tx.update(equipment).set({ ...equipmentPatch, updatedAt: new Date() }).where(eq(equipment.id, id)).returning({ id: equipment.id });
         if (!row) return null;
         if (materialKinds !== undefined) {
-          await tx.delete(equipmentMaterialScopes).where(eq(equipmentMaterialScopes.equipmentId, id));
-          await tx.insert(equipmentMaterialScopes).values(materialKinds.map((materialKind) => ({ equipmentId: id, materialKind })));
+          // Retained scopes may already be referenced by reports/retase. Never delete them.
+          await tx.delete(equipmentMaterialScopes).where(and(eq(equipmentMaterialScopes.equipmentId, id), notInArray(equipmentMaterialScopes.materialKind, materialKinds)));
+          await tx.insert(equipmentMaterialScopes).values(materialKinds.map((materialKind) => ({ equipmentId: id, materialKind })))
+            .onConflictDoUpdate({ target: [equipmentMaterialScopes.equipmentId, equipmentMaterialScopes.materialKind], set: { active: true } });
         }
         return row.id;
       });

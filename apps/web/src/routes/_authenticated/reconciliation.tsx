@@ -215,6 +215,8 @@ function LimestoneReconciliationPage() {
         <div className="filter-button"><button className="btn" onClick={() => void query.refetch()}>Refresh</button></div>
       </div>
 
+      {query.data?.items.some(item => item.crusherId === null) && <div className="card reconciliation-banner"><small>Penugasan lintas crusher dihitung satu kali untuk seluruh tujuan. Filter crusher menyertakan penugasan tersebut; Observed, Reserved, dan Remaining tetap total penugasan lintas crusher, bukan subtotal crusher yang dipilih.</small></div>}
+
       <div className="reconciliation-kpis">
         <div className="card kpi"><span>Assignments</span><strong>{summary?.assignmentCount ?? 0}</strong></div>
         <div className="card kpi"><span>Observed Retase</span><strong>{summary?.observedRetase ?? 0}</strong></div>

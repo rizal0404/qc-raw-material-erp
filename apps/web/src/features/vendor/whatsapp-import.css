@@ -1,0 +1,35 @@
+.vendor-report-panel { border: 0; padding: 0; margin: 0; min-width: 0; }
+.vendor-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.vendor-tabs [aria-selected="true"] { background: #0e7490; border-color: #0e7490; color: #fff; }
+.vendor-shift-page [hidden] { display: none !important; }
+.wa-import { min-width: 0; }
+.wa-intro { display: flex; justify-content: space-between; gap: 24px; padding: 20px; border-top: 3px solid #0e7490; }
+.wa-intro h2 { margin: 4px 0 8px; font-size: 20px; }
+.wa-intro p, .wa-apply p { color: #475467; line-height: 1.6; }
+.wa-intro ol { flex-shrink: 0; color: #0e7490; line-height: 2; font-weight: 600; }
+.wa-input, .wa-apply { padding: 18px; }
+.wa-input > label { display: block; font-weight: 700; margin-bottom: 10px; }
+.wa-input textarea { box-sizing: border-box; width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; resize: vertical; font: 13px/1.6 monospace; margin-bottom: 12px; }
+.wa-input .inline-actions { gap: 12px; flex-wrap: wrap; color: #667085; }
+.wa-summary { overflow: hidden; }
+.wa-summary dl { display: grid; grid-template-columns: 2fr 1.4fr 1fr 1fr; gap: 16px; padding: 16px; margin: 0; }
+.wa-summary dt { color: #667085; font-size: 12px; margin-bottom: 6px; }
+.wa-summary dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.wa-warning { margin: 12px; padding: 12px 16px; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; color: #854d0e; line-height: 1.6; }
+.wa-warning ul { margin: 6px 0 0; padding-left: 20px; }
+.wa-aa-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; padding: 12px; border-top: 1px dashed #d9e2ec; }
+.wa-aa-grid label span { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.wa-aa-grid select { width: 100%; min-height: 36px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; }
+.wa-confirm { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 16px; line-height: 1.6; }
+.wa-import select:focus-visible, .wa-import textarea:focus-visible, .vendor-tabs button:focus-visible { outline: 2px solid #0891b2; outline-offset: 2px; }
+@media (max-width: 800px) { .wa-intro { flex-direction: column; gap: 4px; } .wa-summary dl { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) { .wa-summary dl { grid-template-columns: 1fr; } }
+
+.wa-vendor-picker { padding: 16px; max-width: 720px; }
+.wa-reference { min-width: 0; }
+.wa-reference > label > span { display: block; font-weight: 600; margin-bottom: 6px; }
+.wa-reference select, .wa-reference > details > input { width: 100%; min-height: 36px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px; background: white; }
+.wa-reference details { margin-top: 8px; }
+.wa-reference summary { cursor: pointer; font-size: 12px; color: #0e7490; }
+.wa-match-list { display: grid; gap: 5px; padding: 8px 0; }
+.wa-match-list button { text-align: left; white-space: normal; }

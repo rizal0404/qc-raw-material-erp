@@ -109,6 +109,19 @@ export async function buildApp(config: AppConfig) {
     }
     const postgresCode = (error as { code?: string; cause?: { code?: string } }).code
       ?? (error as { cause?: { code?: string } }).cause?.code;
+    if (postgresCode === '23502') {
+      const pgError = error as { table_name?: string; column_name?: string; cause?: { table_name?: string; column_name?: string } };
+      const table = pgError.table_name ?? pgError.cause?.table_name;
+      const column = pgError.column_name ?? pgError.cause?.column_name;
+      if (column === 'crusher_id' && (table === 'loading_assignments' || table === 'qc_retase_allocations')) {
+        request.log.error({ code: postgresCode, table, column }, 'Optional crusher migration is missing on the API database.');
+        return reply.status(503).send({
+          ok: false, code: 'DATABASE_MIGRATION_REQUIRED',
+          message: 'Database API belum mendukung crusher opsional. Terapkan migrasi 0018_optional_assignment_crusher.sql pada database yang digunakan API, lalu coba simpan kembali.',
+          requestId: request.id,
+        });
+      }
+    }
     if (postgresCode === '23505') {
       return reply.status(409).send({ ok: false, code: 'UNIQUE_CONSTRAINT', message: 'Data dengan business key yang sama sudah ada.', requestId: request.id });
     }

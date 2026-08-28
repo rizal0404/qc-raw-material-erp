@@ -24,9 +24,9 @@ export interface LoadingAssignmentRecord {
   blockSnapshot: string | null;
   materialCategory: string;
   materialKind: MaterialKind;
-  crusherId: string;
-  crusherCode: string;
-  crusherName: string;
+  crusherId: string | null;
+  crusherCode: string | null;
+  crusherName: string | null;
   pileId: string | null;
   pileCode: string | null;
   pileName: string | null;
@@ -68,7 +68,7 @@ export interface AssignmentWriteRecord {
   blockSnapshot: string | null;
   materialCategory: string;
   materialKind: MaterialKind;
-  crusherId: string;
+  crusherId: string | null;
   pileId: string | null;
   validFrom: string | null;
   validTo: string | null;

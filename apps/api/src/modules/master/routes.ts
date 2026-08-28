@@ -31,7 +31,7 @@ export async function registerMasterRoutes(app: FastifyInstance, service: Master
     const result = await service.listVendors({ ...listFilter(service, q), ...(q.materialKind ? { materialKind: q.materialKind } : {}) });
     return { ok: true as const, ...result };
   });
-  app.post('/vendors', adminOnly, async (request) => {
+  app.post('/vendors', { preHandler: app.auth.requireRoles('QC_ANALYST','SUPERVISOR_ADMIN') }, async (request) => {
     const body = CreateVendorRequestSchema.parse(request.body);
     return { ok: true as const, item: await service.createVendor(request.principal!, body, request.id) };
   });
@@ -73,7 +73,7 @@ export async function registerMasterRoutes(app: FastifyInstance, service: Master
     const result = await service.listEquipment({ ...listFilter(service, q), ...(q.vendorId ? { vendorId: q.vendorId } : {}), ...(q.type ? { type: q.type } : {}), ...(q.materialKind ? { materialKind: q.materialKind } : {}) });
     return { ok: true as const, ...result };
   });
-  app.post('/equipment', adminOnly, async (request) => {
+  app.post('/equipment', { preHandler: app.auth.requireRoles('QC_ANALYST','SUPERVISOR_ADMIN') }, async (request) => {
     const body = CreateEquipmentRequestSchema.parse(request.body);
     return { ok: true as const, item: await service.createEquipment(request.principal!, body, request.id) };
   });

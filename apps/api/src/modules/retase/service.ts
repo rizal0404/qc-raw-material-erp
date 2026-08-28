@@ -110,7 +110,7 @@ export function createRetaseService(repository:RetaseEventRepository,master:Mast
       let manual={vendorId:null as string|null,vendorName:null as string|null,aaId:null as string|null,aaUnitNo:clean(input.unlistedUnitNo)};
 
       if(input.assignmentAaId){
-        const found=await repository.getAssignmentAaById(input.assignmentAaId);if(!found)throw notFound('Assignment AA tidak ditemukan pada effective submitted report.');
+        const found=await repository.getAssignmentAaById(input.assignmentAaId,input.crusherId);if(!found)throw notFound('Assignment AA tidak ditemukan pada effective submitted report.');
         if(found.operationDate!==input.operationDate||found.shiftCode!==input.shiftCode||found.crusherId!==input.crusherId)throw new AppError(409,'ASSIGNMENT_CONTEXT_MISMATCH','Assignment AA tidak sesuai date/shift/crusher counter.');
         if(!(await activeResolution(found,current.localMinute)))throw new AppError(409,'ASSIGNMENT_NOT_ACTIVE','Assignment AA tidak aktif pada waktu dump saat ini.');
         resolution=found;

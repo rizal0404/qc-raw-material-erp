@@ -66,7 +66,7 @@ export const ReconciliationAssignmentSchema = z.object({
   reportStatus: z.string(),
   operationDate: IsoDateSchema,
   shiftCode: ShiftCodeSchema,
-  crusherId: z.string().uuid(),
+  crusherId: z.string().uuid().nullable(),
   crusherCode: z.string(),
   crusherName: z.string(),
   vendorId: z.string().uuid(),

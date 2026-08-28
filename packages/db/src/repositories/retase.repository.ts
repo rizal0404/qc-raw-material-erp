@@ -100,7 +100,7 @@ export function createRetaseRepository(db:PostgresJsDatabase<typeof Schema>):Ret
       const rows=await db.execute(sql`
         SELECT la.id,la.assignment_origin,la.operation_date,la.shift_code,la.report_id,vsr.version AS report_version,la.vendor_id,v.code AS vendor_code,v.name AS vendor_name,
                la.am_id,am.unit_no AS am_unit_no,la.source_id,s.code AS source_code,s.name AS source_name,
-               la.block_snapshot,la.material_kind,la.material_category,la.crusher_id,c.code AS crusher_code,c.name AS crusher_name,
+               la.block_snapshot,la.material_kind,la.material_category,c.id AS crusher_id,c.code AS crusher_code,c.name AS crusher_name,
                c.plant_id,pl.code AS plant_code,pl.name AS plant_name,la.pile_id,p.code AS pile_code,p.name AS pile_name,
                la.valid_from,la.valid_to,la.status,la.note,la.created_by,u.display_name AS created_by_name,la.updated_at
         FROM loading_assignments la
@@ -108,10 +108,10 @@ export function createRetaseRepository(db:PostgresJsDatabase<typeof Schema>):Ret
         JOIN vendors v ON v.id=la.vendor_id
         JOIN equipment am ON am.id=la.am_id
         LEFT JOIN sources s ON s.id=la.source_id
-        JOIN crushers c ON c.id=la.crusher_id
+        JOIN crushers c ON c.id=${input.crusherId}::uuid AND c.material_kind=la.material_kind AND c.active=true
         LEFT JOIN plants pl ON pl.id=c.plant_id LEFT JOIN piles p ON p.id=la.pile_id LEFT JOIN users u ON u.id=la.created_by
         WHERE la.operation_date=${input.operationDate}::date AND la.shift_code=${input.shiftCode}
-          AND la.crusher_id=${input.crusherId}::uuid AND la.status='ACTIVE'
+          AND (la.crusher_id=${input.crusherId}::uuid OR la.crusher_id IS NULL) AND la.status='ACTIVE'
           AND (la.assignment_origin='OPERATIONAL' OR vsr.status='SUBMITTED')
         ORDER BY CASE WHEN la.assignment_origin='OPERATIONAL' THEN 0 ELSE 1 END,v.name,am.unit_no,la.created_at
       `);
@@ -149,13 +149,13 @@ export function createRetaseRepository(db:PostgresJsDatabase<typeof Schema>):Ret
         SELECT laa.id AS assignment_aa_id,la.id AS assignment_id,la.assignment_origin,la.report_id,vsr.version AS report_version,la.operation_date,la.shift_code,
                la.vendor_id,v.code AS vendor_code,v.name AS vendor_name,la.am_id,am.unit_no AS am_unit_no,
                laa.aa_id,aa.unit_no AS aa_unit_no,la.source_id,s.code AS source_code,s.name AS source_name,la.block_snapshot,la.material_kind,la.material_category,
-               la.crusher_id,c.code AS crusher_code,c.name AS crusher_name,la.pile_id,p.code AS pile_code,p.name AS pile_name,coalesce(laa.valid_from,la.valid_from) AS valid_from,coalesce(laa.valid_to,la.valid_to) AS valid_to
+               c.id AS crusher_id,c.code AS crusher_code,c.name AS crusher_name,la.pile_id,p.code AS pile_code,p.name AS pile_name,coalesce(laa.valid_from,la.valid_from) AS valid_from,coalesce(laa.valid_to,la.valid_to) AS valid_to
         FROM loading_assignment_aas laa
         JOIN loading_assignments la ON la.id=laa.assignment_id AND la.status='ACTIVE'
         LEFT JOIN vendor_shift_reports vsr ON vsr.id=la.report_id
         JOIN vendors v ON v.id=la.vendor_id JOIN equipment am ON am.id=la.am_id JOIN equipment aa ON aa.id=laa.aa_id
-        LEFT JOIN sources s ON s.id=la.source_id JOIN crushers c ON c.id=la.crusher_id LEFT JOIN piles p ON p.id=la.pile_id
-        WHERE la.operation_date=${input.operationDate}::date AND la.shift_code=${input.shiftCode} AND la.crusher_id=${input.crusherId}::uuid
+        LEFT JOIN sources s ON s.id=la.source_id JOIN crushers c ON c.id=${input.crusherId}::uuid AND c.material_kind=la.material_kind AND c.active=true LEFT JOIN piles p ON p.id=la.pile_id
+        WHERE la.operation_date=${input.operationDate}::date AND la.shift_code=${input.shiftCode} AND (la.crusher_id=${input.crusherId}::uuid OR la.crusher_id IS NULL)
           AND laa.aa_id=${input.aaId}::uuid AND laa.active=true AND (la.assignment_origin='OPERATIONAL' OR vsr.status='SUBMITTED')
         ORDER BY CASE WHEN la.assignment_origin='OPERATIONAL' THEN 0 ELSE 1 END,vsr.version DESC NULLS LAST,la.created_at
       `);
@@ -167,17 +167,17 @@ export function createRetaseRepository(db:PostgresJsDatabase<typeof Schema>):Ret
       }));
     },
 
-    async getAssignmentAaById(assignmentAaId){
+    async getAssignmentAaById(assignmentAaId,crusherId){
       const rows=await db.execute(sql`
         SELECT laa.id AS assignment_aa_id,la.id AS assignment_id,la.assignment_origin,la.report_id,vsr.version AS report_version,la.operation_date,la.shift_code,
                la.vendor_id,v.code AS vendor_code,v.name AS vendor_name,la.am_id,am.unit_no AS am_unit_no,laa.aa_id,aa.unit_no AS aa_unit_no,
-               la.source_id,s.code AS source_code,s.name AS source_name,la.block_snapshot,la.material_kind,la.material_category,la.crusher_id,c.code AS crusher_code,c.name AS crusher_name,la.pile_id,p.code AS pile_code,p.name AS pile_name,
+               la.source_id,s.code AS source_code,s.name AS source_name,la.block_snapshot,la.material_kind,la.material_category,c.id AS crusher_id,c.code AS crusher_code,c.name AS crusher_name,la.pile_id,p.code AS pile_code,p.name AS pile_name,
                coalesce(laa.valid_from,la.valid_from) AS valid_from,coalesce(laa.valid_to,la.valid_to) AS valid_to
         FROM loading_assignment_aas laa JOIN loading_assignments la ON la.id=laa.assignment_id AND la.status='ACTIVE'
         LEFT JOIN vendor_shift_reports vsr ON vsr.id=la.report_id
         JOIN vendors v ON v.id=la.vendor_id JOIN equipment am ON am.id=la.am_id JOIN equipment aa ON aa.id=laa.aa_id
-        LEFT JOIN sources s ON s.id=la.source_id JOIN crushers c ON c.id=la.crusher_id LEFT JOIN piles p ON p.id=la.pile_id
-        WHERE laa.id=${assignmentAaId}::uuid AND laa.active=true AND (la.assignment_origin='OPERATIONAL' OR vsr.status='SUBMITTED') LIMIT 1
+        LEFT JOIN sources s ON s.id=la.source_id JOIN crushers c ON c.id=${crusherId}::uuid AND c.material_kind=la.material_kind AND c.active=true LEFT JOIN piles p ON p.id=la.pile_id
+        WHERE (la.crusher_id IS NULL OR la.crusher_id=${crusherId}::uuid) AND laa.id=${assignmentAaId}::uuid AND laa.active=true AND (la.assignment_origin='OPERATIONAL' OR vsr.status='SUBMITTED') LIMIT 1
       `);
       const r=(rows as unknown as Array<Record<string,unknown>>)[0];
       return r?{
@@ -243,7 +243,7 @@ export function createRetaseRepository(db:PostgresJsDatabase<typeof Schema>):Ret
       return {totalNet:n(t.total_net),dumpEvents:n(t.dump_events),reversalEvents:n(t.reversal_events),unassignedEvents:n(t.unassigned_events),ambiguousEvents:n(t.ambiguous_events),byVendor:bucket(vendorRows),byAm:bucket(amRows),byAa:bucket(aaRows),hourly:(hourRows as unknown as Array<Record<string,unknown>>).map(r=>({hour:str(r.hour),retase:n(r.retase)}))} satisfies RetaseSummaryRecord;
     },
     async countEffectiveSubmittedReports(input){
-      const rows=await db.execute(sql`SELECT count(DISTINCT la.report_id)::int AS total FROM loading_assignments la JOIN vendor_shift_reports r ON r.id=la.report_id AND r.status='SUBMITTED' WHERE la.operation_date=${input.operationDate}::date AND la.shift_code=${input.shiftCode} AND la.crusher_id=${input.crusherId}::uuid AND la.status='ACTIVE'`);
+      const rows=await db.execute(sql`SELECT count(DISTINCT la.report_id)::int AS total FROM loading_assignments la JOIN vendor_shift_reports r ON r.id=la.report_id AND r.status='SUBMITTED' JOIN crushers c ON c.id=${input.crusherId}::uuid AND c.material_kind=la.material_kind AND c.active=true WHERE la.operation_date=${input.operationDate}::date AND la.shift_code=${input.shiftCode} AND (la.crusher_id=${input.crusherId}::uuid OR la.crusher_id IS NULL) AND la.status='ACTIVE'`);
       return n((rows as unknown as Array<Record<string,unknown>>)[0]?.total);
     },
     listOperationalAssignments:operationalAssignments,

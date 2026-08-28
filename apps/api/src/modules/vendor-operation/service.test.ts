@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
+import { forbidden } from '../../lib/errors';
+import { registerVendorOperationRoutes } from './routes';
+import { describe, expect, it, vi } from 'vitest';
+import { CreateShiftReportRequestSchema } from '@qc/contracts';
 import type { MasterRepository, VendorShiftReportRecord, VendorShiftReportRepository } from '@qc/domain';
 import type { AuthPrincipal } from '@qc/domain';
 import { createVendorOperationService } from './service';
@@ -42,7 +46,7 @@ function repoStub():VendorShiftReportRepository{
     },
     async replaceDraft(_id,input){ if(!current)throw new Error('missing'); current={...current,am:input.am,aa:input.aa,note:input.note,updatedAt:new Date()};return current; },
     async submit(){if(!current)throw new Error('missing');current={...current,status:'SUBMITTED',submittedAt:new Date(),submittedBy:principal.userId,submittedByName:'Vendor User'};return current},
-    async createRevision(){throw new Error('not used')},
+    async createRevision(id, actor, reason){if(!current)throw new Error('missing');current={...current,id:'revision-id',version:current.version+1,status:'DRAFT',createdBy:actor,revisesReportId:id,revisionReason:reason};return current;},
     async appendAudit(){},
   };
 }
@@ -61,5 +65,81 @@ describe('VendorOperationService regression',()=>{
     const service=createVendorOperationService(repoStub(),masterStub());
     const created=await service.createDraft(principal,{operationDate:'2026-08-20',shiftCode:'SHIFT_3',materialKind:'LS',am:{total:1,operating:1,standby:0,breakdown:0,repair:0,other:0},aa:{total:1,operating:1,standby:0,breakdown:0,repair:0,other:0},assignments:[{amId,sourceId,crusherId,validFrom:'23:00',validTo:'01:00',aaIds:[aaId]}]});
     expect(created.assignments[0]?.validTo).toBe('01:00');
+  });
+});
+
+describe('QC-managed vendor WhatsApp reports', () => {
+  const body = { vendorId, operationDate:'2026-08-18', shiftCode:'SHIFT_1' as const, materialKind:'LS' as const,
+    am:{total:1,operating:1,standby:0,breakdown:0,repair:0,other:0},
+    aa:{total:1,operating:1,standby:0,breakdown:0,repair:0,other:0},
+    assignments:[{amId,sourceId,crusherId,aaIds:[aaId]}],
+    note:'Sumber: laporan WhatsApp\n' + 'teks laporan asli '.repeat(100),
+  };
+  it.each(['QC_ANALYST','SUPERVISOR_ADMIN'] as const)('allows %s to create, correct, submit and revise with audit attribution',async role=>{
+    const actor={...principal,role,vendorId:null};
+    const repo=repoStub();const audit=vi.spyOn(repo,'appendAudit');
+    const service=createVendorOperationService(repo,masterStub());
+    const validated=CreateShiftReportRequestSchema.parse(body);
+    const created=await service.createDraft(actor,validated);
+    expect(created.note).toBe(body.note.trim());
+    const updated=await service.updateDraft(actor,created.id,{...validated,note:body.note+'\nDikoreksi QC'});
+    expect(updated.note).toContain('Dikoreksi QC');
+    const submitted=await service.submit(actor,created.id,'Ditinjau dari WAG');
+    expect(submitted.status).toBe('SUBMITTED');
+    expect((await service.getEffectiveSubmitted(actor,{vendorId,operationDate:body.operationDate,shiftCode:body.shiftCode,materialKind:'LS'}))?.assignments[0]?.aa[0]?.id).toBe(aaId);
+    const revision=await service.createRevision(actor,submitted.id,'Koreksi rute dari vendor');
+    expect(revision.version).toBe(2);
+    expect(revision.note).toBe(updated.note);
+    expect(audit).toHaveBeenCalledTimes(4);
+    expect(audit.mock.calls.every(([entry])=>entry.actorRoleSnapshot===role && entry.actorUserId===actor.userId)).toBe(true);
+  });
+  it('keeps operator writes and cross-vendor writes forbidden',async()=>{
+    const service=createVendorOperationService(repoStub(),masterStub());
+    await expect(service.createDraft({...principal,role:'CRUSHER_OPERATOR'},body)).rejects.toMatchObject({statusCode:403});
+    await expect(service.createDraft(principal,{...body,vendorId:'another-vendor'})).rejects.toMatchObject({statusCode:403});
+  });
+  it('keeps submit validation and revision protection for QC',async()=>{
+    const actor={...principal,role:'QC_ANALYST' as const,vendorId:null};
+    const service=createVendorOperationService(repoStub(),masterStub());
+    const created=await service.createDraft(actor,{...body,am:{...body.am,total:2}});
+    await expect(service.submit(actor,created.id,null)).rejects.toMatchObject({code:'AM_SUMMARY_UNBALANCED'});
+    await service.updateDraft(actor,created.id,body);
+    await service.submit(actor,created.id,null);
+    await expect(service.updateDraft(actor,created.id,body)).rejects.toMatchObject({code:'REPORT_NOT_DRAFT'});
+    await expect(service.createDraft(actor,body)).rejects.toMatchObject({code:'REVISION_REQUIRED'});
+  });
+  it('bounds original report text without widening assignment note limits',()=>{
+    expect(CreateShiftReportRequestSchema.safeParse({...body,note:'x'.repeat(20_001)}).success).toBe(false);
+    expect(CreateShiftReportRequestSchema.safeParse({...body,assignments:[{...body.assignments[0],note:'x'.repeat(501)}]}).success).toBe(false);
+  });
+});
+
+describe('Vendor report HTTP permissions', () => {
+  it.each(['QC_ANALYST','SUPERVISOR_ADMIN','VENDOR'] as const)('allows %s through all write endpoints',async role=>{
+    const app=Fastify();
+    const actor={...principal,role};
+    app.decorate('auth',{requireRoles:(...roles:string[])=>async(request:FastifyRequest)=>{if(!roles.includes(role))throw forbidden();request.principal=actor;}} as unknown as FastifyInstance['auth']);
+    await registerVendorOperationRoutes(app,createVendorOperationService(repoStub(),masterStub()));
+    try{
+      const body={vendorId,operationDate:'2026-08-18',shiftCode:'SHIFT_1',materialKind:'LS',am:{total:1,operating:1,standby:0,breakdown:0,repair:0,other:0},aa:{total:1,operating:1,standby:0,breakdown:0,repair:0,other:0},assignments:[{amId,sourceId,crusherId,aaIds:[aaId]}],note:'Laporan WhatsApp '+ 'teks '.repeat(150)};
+      const created=await app.inject({method:'POST',url:'/vendor/shift-reports',payload:body});
+      expect(created.statusCode).toBe(200);
+      const id=created.json().item.id;
+      expect((await app.inject({method:'PUT',url:`/vendor/shift-reports/${id}/draft`,payload:body})).statusCode).toBe(200);
+      expect((await app.inject({method:'POST',url:`/vendor/shift-reports/${id}/submit`,payload:{}})).statusCode).toBe(200);
+      expect((await app.inject({method:'POST',url:`/vendor/shift-reports/${id}/revisions`,payload:{reason:'Koreksi laporan WhatsApp'}})).statusCode).toBe(200);
+    }finally{await app.close();}
+  });
+  it('keeps crusher operators blocked at the HTTP boundary',async()=>{
+    const app=Fastify();const createDraft=vi.fn();
+    app.decorate('auth',{requireRoles:(...roles:string[])=>async()=>{if(!roles.includes('CRUSHER_OPERATOR'))throw forbidden();}} as unknown as FastifyInstance['auth']);
+    const service=createVendorOperationService(repoStub(),masterStub());
+    service.createDraft=createDraft;
+    await registerVendorOperationRoutes(app,service);
+    try{
+      const response=await app.inject({method:'POST',url:'/vendor/shift-reports',payload:{}});
+      expect(response.statusCode).toBe(403);
+      expect(createDraft).not.toHaveBeenCalled();
+    }finally{await app.close();}
   });
 });

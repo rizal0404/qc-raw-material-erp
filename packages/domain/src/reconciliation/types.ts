@@ -14,7 +14,7 @@ export interface RetaseAllocationRecord {
 
 export interface ReconciliationAssignmentRecord {
   assignmentId:string; assignmentOrigin:AssignmentOrigin; reportId:string|null; reportVersion:number|null; reportStatus:string; operationDate:string; shiftCode:ShiftCode;
-  crusherId:string; crusherCode:string; crusherName:string; vendorId:string; vendorCode:string; vendorName:string;
+  crusherId:string|null; crusherCode:string; crusherName:string; vendorId:string; vendorCode:string; vendorName:string;
   amId:string; amUnitNo:string; sourceId:string|null; sourceCode:string|null; sourceName:string|null; blockSnapshot:string|null;
   materialKind:MaterialKind; materialCategory:string; assignedAaCount:number; aaWithDumpCount:number; observedRetase:number;
   reservedRetase:number; consumedRetase:number; remainingRetase:number; reviewRequired:boolean; allocations:RetaseAllocationRecord[];

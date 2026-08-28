@@ -72,7 +72,7 @@ export function createVendorOperationRepository(db: PostgresJsDatabase<typeof Sc
     }).from(loadingAssignments)
       .innerJoin(equipment, eq(equipment.id, loadingAssignments.amId))
       .innerJoin(sources, eq(sources.id, loadingAssignments.sourceId))
-      .innerJoin(crushers, eq(crushers.id, loadingAssignments.crusherId))
+      .leftJoin(crushers, eq(crushers.id, loadingAssignments.crusherId))
       .leftJoin(piles, eq(piles.id, loadingAssignments.pileId))
       .where(eq(loadingAssignments.reportId, reportId))
       .orderBy(asc(loadingAssignments.createdAt));

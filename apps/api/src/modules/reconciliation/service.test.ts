@@ -188,7 +188,7 @@ describe('Slice 06 reconciliation service', () => {
         blockSnapshot: 'B9 Tengah',
         materialKind: 'LS',
         materialCategory: 'PILE',
-        crusherId: baseAssignment.crusherId,
+        crusherId: baseAssignment.crusherId!, // This exception fixture has a concrete event destination.
         crusherName: baseAssignment.crusherName,
         aaListed: false,
       }]),

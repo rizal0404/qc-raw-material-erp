@@ -1,3 +1,6 @@
+import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
+import { forbidden } from '../../lib/errors';
+import { registerMasterRoutes } from './routes';
 import { describe, expect, it, vi } from 'vitest';
 import type { AuthPrincipal, MasterRepository } from '@qc/domain';
 import { createMasterService } from './service';
@@ -79,4 +82,31 @@ describe('Master service', () => {
     await expect(service.createVendor(actor, { code: 'NEW', name: 'New Vendor', aliases: [' pt   test '], contactEmail: null, materialKinds:['LS','CL'] })).rejects.toMatchObject({ code: 'VENDOR_ALIAS_EXISTS' });
   });
 
+});
+
+describe('Import master HTTP permissions', () => {
+  it.each(['QC_ANALYST', 'SUPERVISOR_ADMIN', 'VENDOR', 'CRUSHER_OPERATOR'] as const)('scopes inline master creation for %s', async role => {
+    const app = Fastify();
+    const principal = { ...actor, role };
+    app.decorate('auth', { requireRoles: (...roles: string[]) => async (request: FastifyRequest) => {
+      if (!roles.includes(role)) throw forbidden();
+      request.principal = principal;
+    }, requireAuth: async () => {} } as unknown as FastifyInstance['auth']);
+    const service = createMasterService(repo());
+    const createVendor = vi.spyOn(service, 'createVendor').mockResolvedValue({ id: 'v' } as Awaited<ReturnType<typeof service.createVendor>>);
+    const createEquipment = vi.spyOn(service, 'createEquipment').mockResolvedValue({ id: 'e' } as Awaited<ReturnType<typeof service.createEquipment>>);
+    await registerMasterRoutes(app, service);
+    try {
+      const permitted = role === 'QC_ANALYST' || role === 'SUPERVISOR_ADMIN';
+      expect((await app.inject({ method: 'POST', url: '/vendors', payload: { code: 'NEW', name: 'New Vendor', materialKinds: ['LS'] } })).statusCode).toBe(permitted ? 200 : 403);
+      expect((await app.inject({ method: 'POST', url: '/equipment', payload: { vendorId: actor.userId, type: 'AA', unitNo: '11', materialKinds: ['LS'] } })).statusCode).toBe(permitted ? 200 : 403);
+      expect(createVendor).toHaveBeenCalledTimes(permitted ? 1 : 0);
+      expect(createEquipment).toHaveBeenCalledTimes(permitted ? 1 : 0);
+      if (permitted) expect(createVendor.mock.calls[0]?.[0].role).toBe(role);
+      if (role !== 'SUPERVISOR_ADMIN') {
+        expect((await app.inject({ method: 'PATCH', url: '/vendors/' + actor.userId, payload: { name: 'Changed' } })).statusCode).toBe(403);
+        expect((await app.inject({ method: 'POST', url: '/crushers', payload: {} })).statusCode).toBe(403);
+      }
+    } finally { await app.close(); }
+  });
 });

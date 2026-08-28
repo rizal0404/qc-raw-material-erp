@@ -40,4 +40,12 @@ describe('vendor shift validation',()=>{
     ],shift1);
     expect(conflicts).toEqual([]);
   });
+
+  it('treats an unspecified crusher as overlapping every destination for the same AA', () => {
+    expect(findAssignmentConflicts([
+      { amId: 'am-1', crusherId: null, aaIds: ['aa-1'], validFrom: null, validTo: null },
+      { amId: 'am-2', crusherId: 'crusher-2', aaIds: ['aa-1'], validFrom: null, validTo: null },
+    ], shift1).map(x => x.type)).toEqual(['AA_OVERLAP']);
+  });
+
 });

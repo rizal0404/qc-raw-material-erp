@@ -14,7 +14,7 @@ function paramId(request:{params:unknown}):string{
 
 export async function registerVendorOperationRoutes(app:FastifyInstance,service:VendorOperationService){
   const readRoles={preHandler:app.auth.requireRoles('VENDOR','QC_ANALYST','SUPERVISOR_ADMIN')};
-  const writeRoles={preHandler:app.auth.requireRoles('VENDOR','SUPERVISOR_ADMIN')};
+  const writeRoles={preHandler:app.auth.requireRoles('VENDOR','QC_ANALYST','SUPERVISOR_ADMIN')};
 
   app.get('/vendor/shift-reports/current',readRoles,async(request)=>{
     const query=ShiftReportCurrentQuerySchema.parse(request.query);

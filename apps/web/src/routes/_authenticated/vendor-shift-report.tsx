@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import type { CounterAssignment, FleetSummary, OperationalAssignmentInput, ShiftAssignmentInput, ShiftCode, ShiftReport, ShiftReportDraftInput } from '@qc/contracts';
@@ -10,6 +10,10 @@ import {
   createShiftReport, createShiftReportRevision, equipmentLookup, getCurrentShiftReport, listShiftReports, submitShiftReport, updateShiftReportDraft,
 } from '../../features/vendor/vendor-api';
 import { cancelOperationalAssignment, createOperationalAssignment, listOperationalAssignments, updateOperationalAssignment } from '../../features/retase/retase-api';
+
+import { createMaster } from '../../features/master/master-api';
+import type { CreateVendorRequest, CreateEquipmentRequest, Vendor, Equipment } from '@qc/contracts';
+import { WhatsAppImport, type WhatsAppImportResult } from '../../features/vendor/whatsapp-import';
 
 export const Route=createFileRoute('/_authenticated/vendor-shift-report')({component:VendorShiftReportPage});
 
@@ -30,7 +34,7 @@ function fromReport(report:ShiftReport|null):EditorState{
   if(!report)return blankEditor();
   return{
     am:{...report.am},aa:{...report.aa},note:report.note??'',
-    assignments:report.assignments.map(a=>({key:a.id,amId:a.amId,sourceId:a.sourceId,crusherId:a.crusherId,pileId:a.pileId??'',blockSnapshot:a.blockSnapshot??'',validFrom:a.validFrom??'',validTo:a.validTo??'',aaIds:a.aa.map(x=>x.id),note:a.note??'',aaSearch:''})),
+    assignments:report.assignments.map(a=>({key:a.id,amId:a.amId,sourceId:a.sourceId,crusherId:a.crusherId??'',pileId:a.pileId??'',blockSnapshot:a.blockSnapshot??'',validFrom:a.validFrom??'',validTo:a.validTo??'',aaIds:a.aa.map(x=>x.id),note:a.note??'',aaSearch:''})),
   };
 }
 function fromOperational(item:CounterAssignment):LocalAssignment{return{key:item.id,amId:item.amId,sourceId:item.sourceId??'',crusherId:item.crusherId,pileId:item.pileId??'',blockSnapshot:item.blockSnapshot??'',validFrom:item.validFrom??'',validTo:item.validTo??'',aaIds:item.aa.map(x=>x.aaId),note:item.note??'',aaSearch:''};}
@@ -44,9 +48,11 @@ function FleetEditor({title,value,onChange,readonly=false}:{title:string;value:F
 function VendorShiftReportPage(){
   const qc=useQueryClient();const auth=useQuery(authQueryOptions);const user=auth.data?.user;const materialKind=useMaterial();const lookups=useMaterialLookups();
   const [operationDate,setOperationDate]=useState(today());const [shiftCode,setShiftCode]=useState<ShiftCode>('SHIFT_1');const [selectedVendorId,setSelectedVendorId]=useState(user?.vendorId??'');const [editor,setEditor]=useState<EditorState>(blankEditor());const [message,setMessage]=useState('Ready');const [revisionReason,setRevisionReason]=useState('');const [operational,setOperational]=useState<LocalAssignment>(newAssignment());const [operationalEditId,setOperationalEditId]=useState<string|null>(null);
+  const [tab,setTab]=useState<'report'|'whatsapp'>('report');const [importDirty,setImportDirty]=useState(false);const [masterPending,setMasterPending]=useState(false);
+  const baseline=useRef(JSON.stringify(blankEditor()));const editorDirty=JSON.stringify(editor)!==baseline.current;const dirtyRef=useRef(false);dirtyRef.current=editorDirty;
   const effectiveVendorId=user?.role==='VENDOR'?(user.vendorId??''):selectedVendorId;
   useEffect(()=>{if(user?.role==='VENDOR'&&user.vendorId)setSelectedVendorId(user.vendorId)},[user?.role,user?.vendorId]);
-  useEffect(()=>{setEditor(blankEditor());setOperational(newAssignment());setOperationalEditId(null);setMessage('Loading context...')},[operationDate,shiftCode,materialKind,effectiveVendorId]);
+  useEffect(()=>{baseline.current=JSON.stringify(blankEditor());dirtyRef.current=false;setEditor(blankEditor());setOperational(newAssignment());setOperationalEditId(null);setMessage('Loading context...')},[operationDate,shiftCode,materialKind,effectiveVendorId]);
 
   const current=useQuery({queryKey:['vendor-shift-current',effectiveVendorId,operationDate,shiftCode,materialKind],queryFn:()=>getCurrentShiftReport({...(effectiveVendorId?{vendorId:effectiveVendorId}:{}),operationDate,shiftCode,materialKind}),enabled:!!effectiveVendorId&&!!operationDate});
   const history=useQuery({queryKey:['vendor-shift-history',effectiveVendorId,operationDate,shiftCode,materialKind],queryFn:()=>listShiftReports({...(effectiveVendorId?{vendorId:effectiveVendorId}:{}),operationDate,shiftCode,materialKind,limit:50,offset:0}),enabled:!!effectiveVendorId&&!!operationDate});
@@ -55,50 +61,83 @@ function VendorShiftReportPage(){
   const operationalList=useQuery({queryKey:['operational-assignments',effectiveVendorId,operationDate,shiftCode,materialKind],queryFn:async()=>{const result=await listOperationalAssignments({vendorId:effectiveVendorId,operationDate,shiftCode});return {...result,items:result.items.filter(item=>item.materialKind===materialKind)}},enabled:!!effectiveVendorId&&['VENDOR','QC_ANALYST','SUPERVISOR_ADMIN'].includes(user?.role??'')});
 
   const report=current.data?.item??null;
-  useEffect(()=>{if(current.data){setEditor(fromReport(current.data.item));setMessage(current.data.item?`Loaded ${current.data.item.status} · V${current.data.item.version}`:'Belum ada report untuk konteks ini.')}},[current.data]);
+  useEffect(()=>{if(current.data&&!dirtyRef.current){const next=fromReport(current.data.item);baseline.current=JSON.stringify(next);setEditor(next);setMessage(current.data.item?`Loaded ${current.data.item.status} · V${current.data.item.version}`:'Belum ada report untuk konteks ini.')}},[current.data]);
 
-  const canWrite=user?.role==='VENDOR'||user?.role==='SUPERVISOR_ADMIN';const canManageOperational=['VENDOR','QC_ANALYST','SUPERVISOR_ADMIN'].includes(user?.role??'');const isDraft=report?.status==='DRAFT';const readonly=!!report&&!isDraft;const vendors=lookups.data?.vendors??[];
-  const saveMutation=useMutation({
-    mutationFn:async()=>{
+  const canWrite=['VENDOR','QC_ANALYST','SUPERVISOR_ADMIN'].includes(user?.role??'');const canImport=['QC_ANALYST','SUPERVISOR_ADMIN'].includes(user?.role??'');const canManageOperational=['VENDOR','QC_ANALYST','SUPERVISOR_ADMIN'].includes(user?.role??'');const isDraft=report?.status==='DRAFT';const readonly=!!report&&!isDraft;const vendors=lookups.data?.vendors??[];
+  function loadSaved(item:ShiftReport){const next=fromReport(item);baseline.current=JSON.stringify(next);dirtyRef.current=false;setEditor(next);qc.setQueryData(['vendor-shift-current',effectiveVendorId,operationDate,shiftCode,materialKind],{ok:true,item});}
+  async function refreshReports(){await Promise.all(['vendor-shift-current','vendor-shift-history','counter-assignments','counter-context','reconciliation','reconciliation-exception-assignments','retase-suggestions'].map(key=>qc.invalidateQueries({queryKey:[key]})));}
+  async function persistDraft(){
       if(!effectiveVendorId)throw new Error('Vendor wajib dipilih.');
-      const assignments:ShiftAssignmentInput[]=editor.assignments.map(a=>({amId:a.amId,sourceId:a.sourceId,crusherId:a.crusherId,pileId:a.pileId||null,blockSnapshot:a.blockSnapshot||null,validFrom:a.validFrom||null,validTo:a.validTo||null,aaIds:a.aaIds,note:a.note||null}));
+      if(current.isError||current.isFetching||!current.data)throw new Error('Tunggu konteks laporan berhasil dimuat.');
+      if(readonly)throw new Error('Buat revision sebelum mengubah laporan SUBMITTED.');
+      const assignments:ShiftAssignmentInput[]=editor.assignments.map(a=>({amId:a.amId,sourceId:a.sourceId,crusherId:a.crusherId||null,pileId:a.pileId||null,blockSnapshot:a.blockSnapshot||null,validFrom:a.validFrom||null,validTo:a.validTo||null,aaIds:a.aaIds,note:a.note||null}));
       if(report?.status==='DRAFT')return updateShiftReportDraft(report.id,{am:editor.am,aa:editor.aa,note:editor.note||null,assignments});
       const body:ShiftReportDraftInput={vendorId:effectiveVendorId,operationDate,shiftCode,materialKind,am:editor.am,aa:editor.aa,note:editor.note||null,assignments};
       return createShiftReport(body);
-    },
-    onSuccess:async r=>{setMessage(`Draft tersimpan · V${r.item.version}`);setEditor(fromReport(r.item));await Promise.all([qc.invalidateQueries({queryKey:['vendor-shift-current']}),qc.invalidateQueries({queryKey:['vendor-shift-history']})]);},
+  }
+  const saveMutation=useMutation({
+    mutationFn:persistDraft,
+    onSuccess:async r=>{loadSaved(r.item);await refreshReports();setMessage(`Draft tersimpan · V${r.item.version}`);},
     onError:e=>setMessage(e.message),
   });
-  const submitMutation=useMutation({mutationFn:async()=>{if(!report?.id)throw new Error('Save Draft terlebih dahulu.');return submitShiftReport(report.id);},onSuccess:async r=>{setMessage(`Report SUBMITTED · V${r.item.version}`);await Promise.all([qc.invalidateQueries({queryKey:['vendor-shift-current']}),qc.invalidateQueries({queryKey:['vendor-shift-history']})]);},onError:e=>setMessage(e.message)});
-  const revisionMutation=useMutation({mutationFn:async()=>{if(!report?.id||report.status!=='SUBMITTED')throw new Error('Revision hanya dari report SUBMITTED.');return createShiftReportRevision(report.id,{reason:revisionReason});},onSuccess:async r=>{setRevisionReason('');setMessage(`Draft revision V${r.item.version} dibuat.`);await Promise.all([qc.invalidateQueries({queryKey:['vendor-shift-current']}),qc.invalidateQueries({queryKey:['vendor-shift-history']})]);},onError:e=>setMessage(e.message)});
+  const submitMutation=useMutation({mutationFn:async()=>{const saved=await persistDraft();loadSaved(saved.item);return submitShiftReport(saved.item.id);},onSuccess:async r=>{loadSaved(r.item);await refreshReports();setMessage(`Report SUBMITTED · V${r.item.version}. Penugasan tersedia untuk retase dan rekonsiliasi.`);},onError:e=>setMessage(e.message)});
+  const revisionMutation=useMutation({mutationFn:async()=>{if(!report?.id||report.status!=='SUBMITTED')throw new Error('Revision hanya dari report SUBMITTED.');return createShiftReportRevision(report.id,{reason:revisionReason});},onSuccess:async r=>{loadSaved(r.item);setRevisionReason('');await refreshReports();setMessage(`Draft revision V${r.item.version} dibuat.`);},onError:e=>setMessage(e.message)});
   const saveOperationalMutation=useMutation({mutationFn:async()=>{if(!effectiveVendorId)throw new Error('Vendor wajib dipilih.');const body:OperationalAssignmentInput={vendorId:effectiveVendorId,operationDate,shiftCode,amId:operational.amId,sourceId:operational.sourceId||null,crusherId:operational.crusherId,pileId:operational.pileId||null,blockSnapshot:operational.blockSnapshot||null,validFrom:operational.validFrom||null,validTo:operational.validTo||null,aaIds:operational.aaIds,note:operational.note||null};if(operationalEditId){const {vendorId:_vendor,operationDate:_date,shiftCode:_shift,...update}=body;return updateOperationalAssignment(operationalEditId,update);}return createOperationalAssignment(body);},onSuccess:async r=>{setMessage(`Operational assignment ${operationalEditId?'diubah':'dibuat'} · ${r.item.crusherName}`);setOperational(newAssignment());setOperationalEditId(null);await Promise.all([qc.invalidateQueries({queryKey:['operational-assignments']}),qc.invalidateQueries({queryKey:['counter-assignments']}),qc.invalidateQueries({queryKey:['counter-context']})]);},onError:e=>setMessage(e.message)});
   const cancelOperationalMutation=useMutation({mutationFn:(id:string)=>cancelOperationalAssignment(id,'Assignment dibatalkan atau unit di-routing ulang.'),onSuccess:async()=>{setMessage('Operational assignment dibatalkan.');await Promise.all([qc.invalidateQueries({queryKey:['operational-assignments']}),qc.invalidateQueries({queryKey:['counter-assignments']}),qc.invalidateQueries({queryKey:['counter-context']})]);},onError:e=>setMessage(e.message)});
 
-  useDraftGuard(saveMutation.isPending||saveOperationalMutation.isPending||JSON.stringify(editor)!==JSON.stringify(fromReport(report))||!!operational.amId);
+  const busy=masterPending||saveMutation.isPending||submitMutation.isPending||revisionMutation.isPending||saveOperationalMutation.isPending;
+  useDraftGuard(busy||editorDirty||importDirty||!!operational.amId);
+  function changeContext(next:{vendorId?:string;operationDate?:string;shiftCode?:ShiftCode}){
+    if(saveMutation.isPending||submitMutation.isPending||revisionMutation.isPending||saveOperationalMutation.isPending)return;
+    if((editorDirty||!!operational.amId)&&!window.confirm('Perubahan editor belum disimpan. Ganti konteks dan tinggalkan perubahan tersebut?'))return;
+    if(next.vendorId!==undefined)setSelectedVendorId(next.vendorId);if(next.operationDate!==undefined)setOperationDate(next.operationDate);if(next.shiftCode!==undefined)setShiftCode(next.shiftCode);
+  }
+  async function createImportVendor(input:CreateVendorRequest){
+    setMasterPending(true);
+    try{const result=await createMaster<Vendor>('vendors',input);await Promise.all([qc.invalidateQueries({queryKey:['lookups','master']}),qc.invalidateQueries({queryKey:['master']})]);return result.item.id;}finally{setMasterPending(false);}
+  }
+  async function createImportEquipment(input:CreateEquipmentRequest){
+    setMasterPending(true);
+    try{const result=await createMaster<Equipment>('equipment',input);await Promise.all([qc.invalidateQueries({queryKey:['equipment-lookup']}),qc.invalidateQueries({queryKey:['master']})]);return result.item.id;}finally{setMasterPending(false);}
+  }
+  function applyImport(result:WhatsAppImportResult){
+    if(!canImport||readonly||busy||current.isFetching||current.isError||!current.data)return false;
+    if((report||editorDirty)&&!window.confirm('Ganti seluruh ringkasan, penugasan, dan catatan di editor dengan hasil impor? Perubahan baru tersimpan setelah Save Draft atau Simpan & Submit.'))return false;
+    setEditor({am:{...result.parsed.am},aa:{...result.parsed.aa},note:result.note,assignments:result.assignments.map(a=>({...newAssignment(),...a}))});setTab('report');setMessage('Hasil WhatsApp diterapkan. Periksa ringkasan armada, lengkapi route/pile/waktu, lalu simpan dan submit.');return true;
+  }
 
   function updateAssignment(index:number,patch:Partial<LocalAssignment>){setEditor(prev=>({...prev,assignments:prev.assignments.map((a,i)=>i===index?{...a,...patch}:a)}))}
   function addAssignment(){setEditor(prev=>({...prev,assignments:[...prev.assignments,newAssignment()]}))}
   function removeAssignment(index:number){setEditor(prev=>({...prev,assignments:prev.assignments.filter((_,i)=>i!==index)}))}
-  const submitReady=useMemo(()=>fleetDiff(editor.am)===0&&fleetDiff(editor.aa)===0&&editor.assignments.length>0&&editor.assignments.every(a=>a.amId&&a.sourceId&&a.crusherId&&a.aaIds.length>0),[editor]);
+  const submitReady=useMemo(()=>fleetDiff(editor.am)===0&&fleetDiff(editor.aa)===0&&editor.assignments.length>0&&editor.assignments.every(a=>a.amId&&a.sourceId&&a.aaIds.length>0),[editor]);
   const operationalSource=lookups.data?.sources.find(x=>x.id===operational.sourceId);const operationalCrusher=lookups.data?.crushers.find(x=>x.id===operational.crusherId);const operationalCrushers=(lookups.data?.crushers??[]).filter(x=>x.materialKind===materialKind&&(!operationalSource||x.materialKind===operationalSource.materialKind));const operationalPiles=(lookups.data?.piles??[]).filter(x=>(!operationalCrusher||x.materialKind===operationalCrusher.materialKind)&&(!operationalCrusher?.plantId||!x.plantId||x.plantId===operationalCrusher.plantId));const operationalAaSearch=operational.aaSearch.toLowerCase();const operationalAaItems=(aaLookup.data?.items??[]).filter(x=>!operationalAaSearch||`${x.unitNo} ${x.label}`.toLowerCase().includes(operationalAaSearch));const operationalReady=!!operational.amId&&!!operational.crusherId&&operational.aaIds.length>0&&(!!operational.sourceId||operationalCrusher?.materialKind==='CL');
 
   return <section className="page-stack vendor-shift-page">
     <div className="page-heading"><div><p className="eyebrow">{materialNames[materialKind]} / OPERASI VENDOR</p><h1>Laporan Shift Vendor</h1><p>{materialKind==='CL'?'Laporan pendukung opsional. Laporan utama dan retase Clay tetap berjalan mandiri di Laporan Crusher.':'Atur kesiapan armada dan penugasan per shift untuk mendukung pencatatan retase Limestone.'}</p></div>{report&&<span className={`status-badge ${report.status==='SUBMITTED'?'success':report.status==='DRAFT'?'warning':'muted'}`}>{report.status} · V{report.version}</span>}</div>
 
     <div className="card vendor-context-grid">
-      <label><span>Operation Date</span><input type="date" value={operationDate} onChange={e=>setOperationDate(e.target.value)}/></label>
-      <label><span>Shift</span><select value={shiftCode} onChange={e=>setShiftCode(e.target.value as ShiftCode)}>{(lookups.data?.shifts??[]).map(s=><option key={s.code} value={s.code}>{s.label} · {s.startTime.slice(0,5)}–{s.endTime.slice(0,5)}</option>)}</select></label>
+      <label><span>Operation Date</span><input type="date" value={operationDate} disabled={busy} onChange={e=>changeContext({operationDate:e.target.value})}/></label>
+      <label><span>Shift</span><select value={shiftCode} disabled={busy} onChange={e=>changeContext({shiftCode:e.target.value as ShiftCode})}>{(lookups.data?.shifts??[]).map(s=><option key={s.code} value={s.code}>{s.label} · {s.startTime.slice(0,5)}–{s.endTime.slice(0,5)}</option>)}</select></label>
       <label><span>Material report</span><input value={materialNames[materialKind]} readOnly /></label>
-      <label><span>Vendor</span>{user?.role==='VENDOR'?<input readOnly value={vendors.find(v=>v.id===effectiveVendorId)?.label??user.displayName}/>:<select value={selectedVendorId} onChange={e=>setSelectedVendorId(e.target.value)}><option value="">— pilih vendor —</option>{vendors.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}</select>}</label>
+      <label><span>Vendor</span>{user?.role==='VENDOR'?<input readOnly value={vendors.find(v=>v.id===effectiveVendorId)?.label??user.displayName}/>:<select value={selectedVendorId} disabled={busy} onChange={e=>changeContext({vendorId:e.target.value})}><option value="">— pilih vendor —</option>{vendors.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}</select>}</label>
       <label><span>Prepared By</span><input readOnly value={report?.createdByName??user?.displayName??''}/></label>
       <label><span>Status / Version</span><input readOnly value={report?`${report.status} · V${report.version}`:'NEW DRAFT'}/></label>
       <label><span>Last Update</span><input readOnly value={report?new Date(report.updatedAt).toLocaleString('id-ID'):'—'}/></label>
     </div>
 
+    {canImport&&<div className="vendor-tabs" role="tablist" aria-label="Metode laporan vendor"><button id="report-tab" type="button" role="tab" aria-controls="report-panel" aria-selected={tab==='report'} className="btn" onClick={()=>setTab('report')}>Editor laporan</button><button id="whatsapp-tab" type="button" role="tab" aria-controls="whatsapp-panel" aria-selected={tab==='whatsapp'} className="btn" onClick={()=>setTab('whatsapp')}>Impor WhatsApp</button></div>}
+    {current.isError&&<div className="card wa-warning" role="alert">Gagal memuat laporan: {current.error.message} <button className="btn" onClick={()=>void current.refetch()}>Coba lagi</button></div>}
+    {canImport&&<div id="whatsapp-panel" role="tabpanel" aria-labelledby="whatsapp-tab" hidden={tab!=='whatsapp'}>
+      {(lookups.isError||amLookup.isError||aaLookup.isError)&&<p role="alert">Master gagal dimuat. Coba muat ulang sebelum menerapkan impor.</p>}
+      <button type="button" className="btn" disabled={lookups.isFetching||amLookup.isFetching||aaLookup.isFetching} onClick={()=>{void lookups.refetch();if(effectiveVendorId){void amLookup.refetch();void aaLookup.refetch();}}}>Muat ulang master</button>
+      <WhatsAppImport vendorId={effectiveVendorId} operationDate={operationDate} shiftCode={shiftCode} materialKind={materialKind} lookups={lookups.data} amItems={amLookup.data?.items??[]} aaItems={aaLookup.data?.items??[]} disabled={readonly||busy||current.isFetching||current.isError||!current.data||lookups.isFetching||lookups.isError||amLookup.isFetching||amLookup.isError||aaLookup.isFetching||aaLookup.isError} onDirty={setImportDirty} onContext={changeContext} onApply={applyImport} onCreateVendor={createImportVendor} onCreateEquipment={createImportEquipment} masterPending={masterPending}/>
+      {report?.status==='SUBMITTED'&&<div className="card wa-apply"><p>Laporan sudah SUBMITTED. Buka Editor laporan → Create Revision, kemudian terapkan hasil impor pada draft revision.</p><button className="btn" onClick={()=>setTab('report')}>Buka editor untuk revision</button></div>}
+    </div>}
+    <fieldset id="report-panel" className="vendor-report-panel page-stack" role="tabpanel" aria-labelledby={canImport?'report-tab':undefined} hidden={tab!=='report'} disabled={busy}>
     <div className="card vendor-fleet-wrap"><FleetEditor title="Alat Muat (AM)" value={editor.am} readonly={readonly||!canWrite} onChange={am=>setEditor(p=>({...p,am}))}/><FleetEditor title="Alat Angkut (AA)" value={editor.aa} readonly={readonly||!canWrite} onChange={aa=>setEditor(p=>({...p,aa}))}/></div>
 
     <div className="card assignment-section">
-      <div className="section-toolbar"><div><strong>Loading Assignment</strong><small>Satu AM boleh dipakai pada beberapa route Crusher/Plant/Pile. AA yang sama boleh di-routing ke crusher berbeda.</small></div>{canWrite&&!readonly&&<button className="btn primary" type="button" onClick={addAssignment}>+ Add Assignment</button>}</div>
+      <div className="section-toolbar"><div><strong>Loading Assignment</strong><small>Crusher kosong = penugasan lintas crusher untuk material ini. Tujuan aktual tetap dicatat pada event retase. Pilih crusher bila ingin membatasi route atau menentukan pile.</small></div>{canWrite&&!readonly&&<button className="btn primary" type="button" onClick={addAssignment}>+ Add Assignment</button>}</div>
       {!editor.assignments.length&&<div className="assignment-empty">Belum ada assignment.</div>}
       <div className="assignment-list">{editor.assignments.map((a,index)=>{
         const source=lookups.data?.sources.find(s=>s.id===a.sourceId);const crusher=lookups.data?.crushers.find(c=>c.id===a.crusherId);const crushers=(lookups.data?.crushers??[]).filter(c=>!source||c.materialKind===source.materialKind);const piles=(lookups.data?.piles??[]).filter(p=>(!crusher||p.materialKind===crusher.materialKind)&&(!crusher?.plantId||!p.plantId||p.plantId===crusher.plantId));const aaSearch=a.aaSearch.toLowerCase();const aaItems=(aaLookup.data?.items??[]).filter(x=>!aaSearch||`${x.unitNo} ${x.label}`.toLowerCase().includes(aaSearch));
@@ -107,7 +146,7 @@ function VendorShiftReportPage(){
           <label><span>Source / Block</span><select disabled={readonly||!canWrite} value={a.sourceId} onChange={e=>{const src=lookups.data?.sources.find(s=>s.id===e.target.value);updateAssignment(index,{sourceId:e.target.value,blockSnapshot:src?.block??'',crusherId:'',pileId:''})}}><option value="">— pilih source —</option>{(lookups.data?.sources??[]).filter(x=>x.materialKind===materialKind).map(x=><option key={x.id} value={x.id}>{x.label} · {x.materialKind} · {x.materialCategory}</option>)}</select></label>
           <label><span>Block Snapshot</span><input disabled={readonly||!canWrite} value={a.blockSnapshot} onChange={e=>updateAssignment(index,{blockSnapshot:e.target.value})}/></label>
           <label><span>Material</span><input readOnly value={source?`${source.materialKind} · ${source.materialCategory}`:''}/></label>
-          <label><span>Crusher / Plant Destination</span><select disabled={readonly||!canWrite} value={a.crusherId} onChange={e=>updateAssignment(index,{crusherId:e.target.value,pileId:''})}><option value="">— pilih crusher —</option>{crushers.map(x=><option key={x.id} value={x.id}>{x.label}{x.plantId?` · ${lookups.data?.plants.find(p=>p.id===x.plantId)?.label??'Plant'}`:''}</option>)}</select></label>
+          <label><span>Crusher / Plant Destination (opsional)</span><select disabled={readonly||!canWrite} value={a.crusherId} onChange={e=>updateAssignment(index,{crusherId:e.target.value,pileId:''})}><option value="">— lintas crusher / tidak dibatasi —</option>{crushers.map(x=><option key={x.id} value={x.id}>{x.label}{x.plantId?` · ${lookups.data?.plants.find(p=>p.id===x.plantId)?.label??'Plant'}`:''}</option>)}</select></label>
           <label><span>Pile Destination (opsional)</span><select disabled={readonly||!canWrite||!a.crusherId} value={a.pileId} onChange={e=>updateAssignment(index,{pileId:e.target.value})}><option value="">— belum ditentukan —</option>{piles.map(x=><option key={x.id} value={x.id}>{x.label}</option>)}</select></label>
           <label><span>Start Time</span><input disabled={readonly||!canWrite} type="time" value={a.validFrom} onChange={e=>updateAssignment(index,{validFrom:e.target.value})}/></label>
           <label><span>End Time</span><input disabled={readonly||!canWrite} type="time" value={a.validTo} onChange={e=>updateAssignment(index,{validTo:e.target.value})}/></label>
@@ -135,8 +174,9 @@ function VendorShiftReportPage(){
       <div className="table-shell"><table className="native-table"><thead><tr><th>Status</th><th>AM / AA</th><th>Route</th><th>Window</th><th>Source</th><th>Actor</th><th>Aksi</th></tr></thead><tbody>{(operationalList.data?.items??[]).map(item=><tr key={item.id}><td><span className={`status-badge ${item.status==='ACTIVE'?'success':'muted'}`}>{item.status}</span></td><td>AM {item.amUnitNo}<small className="table-sub">AA {item.aa.map(x=>x.unitNo).join(', ')}</small></td><td>{item.crusherName}<small className="table-sub">{item.plantName??'—'} · {item.pileName??'Pile belum ditentukan'}</small></td><td>{item.validFrom&&item.validTo?`${item.validFrom}–${item.validTo}`:'Full shift'}</td><td>{item.sourceName??'Clay direct / no source'}</td><td>{item.createdByName??'—'}</td><td>{item.status==='ACTIVE'?<div className="inline-actions"><button className="btn small" onClick={()=>{setOperational(fromOperational(item));setOperationalEditId(item.id)}}>Edit</button><button className="btn small" disabled={cancelOperationalMutation.isPending} onClick={()=>cancelOperationalMutation.mutate(item.id)}>Cancel</button></div>:'—'}</td></tr>)}{!operationalList.isFetching&&!operationalList.data?.items.length&&<tr><td colSpan={7} className="table-empty">Belum ada operational assignment untuk konteks ini.</td></tr>}</tbody></table></div>
     </div>}
 
-    <div className="card vendor-note-actions"><label className="vendor-note"><span>Report Note</span><textarea disabled={readonly||!canWrite} rows={3} value={editor.note} onChange={e=>setEditor(p=>({...p,note:e.target.value}))}/></label><div className="vendor-actions"><span className="action-status">{current.isFetching?'Loading current report...':message}</span>{canWrite&&!readonly&&<><button className="btn" disabled={saveMutation.isPending||current.isFetching||!effectiveVendorId} onClick={()=>saveMutation.mutate()}>{saveMutation.isPending?'Saving...':'Save Draft'}</button><button className="btn primary" disabled={!report||!isDraft||!submitReady||submitMutation.isPending} onClick={()=>submitMutation.mutate()}>{submitMutation.isPending?'Submitting...':'Submit'}</button></>}{canWrite&&report?.status==='SUBMITTED'&&<div className="revision-action"><input placeholder="Alasan revision..." value={revisionReason} onChange={e=>setRevisionReason(e.target.value)}/><button className="btn primary" disabled={revisionReason.trim().length<3||revisionMutation.isPending} onClick={()=>revisionMutation.mutate()}>{revisionMutation.isPending?'Creating...':'Create Revision'}</button></div>}</div></div>
+    <div className="card vendor-note-actions"><label className="vendor-note"><span>Report Note</span><textarea disabled={readonly||!canWrite} rows={3} maxLength={20_000} value={editor.note} onChange={e=>setEditor(p=>({...p,note:e.target.value}))}/></label><div className="vendor-actions"><span className="action-status">{current.isFetching?'Loading current report...':message}</span>{canWrite&&!readonly&&<><button className="btn" disabled={busy||current.isFetching||current.isError||!current.data||!effectiveVendorId} onClick={()=>saveMutation.mutate()}>{saveMutation.isPending?'Saving...':'Save Draft'}</button><button className="btn primary" disabled={!submitReady||busy||current.isFetching||current.isError||!current.data||!effectiveVendorId} onClick={()=>submitMutation.mutate()}>{submitMutation.isPending?'Submitting...':'Simpan & Submit'}</button></>}{canWrite&&report?.status==='SUBMITTED'&&<div className="revision-action"><input placeholder="Alasan revision..." value={revisionReason} onChange={e=>setRevisionReason(e.target.value)}/><button className="btn primary" disabled={revisionReason.trim().length<3||revisionMutation.isPending} onClick={()=>revisionMutation.mutate()}>{revisionMutation.isPending?'Creating...':'Create Revision'}</button></div>}</div></div>
 
+    </fieldset>
     <div className="card table-card"><div className="section-toolbar"><div><strong>Version History</strong><small>Submitted version lama dipertahankan sebagai audit history.</small></div><span className="toolbar-meta">{history.data?.total??0} record</span></div><div className="table-shell"><table className="native-table"><thead><tr><th>Version</th><th>Status</th><th>Vendor</th><th>Submitted</th><th>Assignments</th><th>Prepared By</th><th>Revision Reason</th></tr></thead><tbody>{(history.data?.items??[]).map(r=><tr key={r.id}><td><span className="code-chip">V{r.version}</span></td><td><span className={`status-badge ${r.status==='SUBMITTED'?'success':r.status==='DRAFT'?'warning':'muted'}`}>{r.status}</span></td><td>{r.vendorName}</td><td>{r.submittedAt?new Date(r.submittedAt).toLocaleString('id-ID'):'—'}</td><td>{r.assignments.length}</td><td>{r.createdByName}</td><td>{r.revisionReason??'—'}</td></tr>)}{!history.data?.items.length&&<tr><td colSpan={7} className="table-empty">Belum ada history.</td></tr>}</tbody></table></div></div>
   </section>
 }

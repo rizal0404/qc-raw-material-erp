@@ -1,5 +1,24 @@
 # Changelog by VS Code
 
+## 2026-08-28
+
+### Impor laporan vendor WhatsApp dan stabilitas penyimpanan
+
+- Menambahkan tab **Impor WhatsApp** pada Laporan Shift Vendor untuk membaca format laporan vendor yang ditempel dari WhatsApp, termasuk ringkasan AM/AA, rute loading, material, blok, dan tujuan crusher.
+- Menambahkan pencocokan vendor serta AM/AA berdasarkan normalisasi nama, kode, alias, prefiks, zero-padding, dan saran kemiripan. Pemilihan fuzzy tetap memerlukan konfirmasi analyst QC.
+- Menambahkan opsi membuat vendor, AM, dan AA baru langsung dari layar review impor. Master baru divalidasi, diaudit, masuk ke cache lookup, lalu langsung dipakai pada laporan.
+- Menjadikan crusher assignment opsional untuk route lintas crusher. Crusher aktual tetap wajib pada setiap event retase; rekonsiliasi dan Workbench menjaga identitas event serta tidak menghitung retase ganda.
+- Memperbaiki update vendor, equipment, dan plant agar scope material yang masih direferensikan tidak dihapus lalu dibuat ulang. Perubahan nama vendor tidak lagi memicu konflik FK `409 REFERENCE_CONFLICT`.
+- Menambahkan migrasi `0018_optional_assignment_crusher.sql` untuk nullable crusher pada assignment dan alokasi, dengan constraint yang tetap mewajibkan crusher aktual pada event retase dan pile destination.
+- Menambahkan respons `503 DATABASE_MIGRATION_REQUIRED` jika database API belum menjalankan migrasi crusher opsional, sehingga masalah konfigurasi tidak lagi tampil sebagai error server generik `500`.
+
+### Verifikasi
+
+- Unit test web, domain, dan API lulus; termasuk test untuk parser, pencocokan master, modal tambah master, hak akses QC, dan penanganan migrasi.
+- Integrasi PostgreSQL lulus dari pembuatan laporan tanpa crusher, edit master yang direferensikan, pencatatan retase ke dua crusher, rekonsiliasi, hingga konsumsi Workbench mixing.
+- Typecheck dan production build seluruh workspace lulus.
+
+
 ## 2026-08-20
 
 ### Login, session, dan stabilitas fitur
