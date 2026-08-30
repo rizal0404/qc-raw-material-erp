@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --env-file=../../.env --import=tsx --watch src/server.ts",
-    "build": "node ../../scripts/clean-api-dist.mjs && esbuild src/server.ts --bundle --splitting --platform=node --target=node24 --format=esm --external:fastify --external:sharp --external:@fastify/multipart --external:@fastify/cookie --external:@fastify/cors --external:@fastify/swagger --external:@fastify/swagger-ui --external:zod --external:@node-rs/argon2 --alias:@qc/contracts=../../packages/contracts/src/index.ts --alias:@qc/domain=../../packages/domain/src/index.ts --alias:@qc/db=../../packages/db/src/index.ts --outdir=dist --entry-names=[name] --chunk-names=chunks/[name]-[hash] --sourcemap",
+    "build": "node clean-dist.mjs && esbuild src/server.ts --bundle --splitting --platform=node --target=node24 --format=esm --external:fastify --external:sharp --external:@fastify/multipart --external:@fastify/cookie --external:@fastify/cors --external:@fastify/swagger --external:@fastify/swagger-ui --external:zod --external:@node-rs/argon2 --alias:@qc/contracts=../../packages/contracts/src/index.ts --alias:@qc/domain=../../packages/domain/src/index.ts --alias:@qc/db=../../packages/db/src/index.ts --outdir=dist --entry-names=[name] --chunk-names=chunks/[name]-[hash] --sourcemap",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "lint": "echo lint-placeholder",
