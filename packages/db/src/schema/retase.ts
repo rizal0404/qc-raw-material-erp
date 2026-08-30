@@ -6,6 +6,7 @@ import { crushers, equipment, piles, sources } from './master';
 import { loadingAssignmentAas, loadingAssignments, vendorShiftReports } from './vendor-operation';
 import { rawSamples } from './raw-sample';
 import { clayReportColumns, clayShiftReports } from './clay-report';
+import { crusherReportVehicleRows } from './crusher-report';
 
 export const retaseEvents = pgTable('retase_events', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -24,6 +25,7 @@ export const retaseEvents = pgTable('retase_events', {
   clayReportColumnId: uuid('clay_report_column_id').references(() => clayReportColumns.id, { onDelete: 'restrict' }),
   entrySource: text('entry_source').notNull().default('LIVE_COUNTER'),
   entryBatchId: uuid('entry_batch_id'),
+  crusherReportRowId: uuid('crusher_report_row_id').references(()=>crusherReportVehicleRows.id),
   amId: uuid('am_id').references(() => equipment.id, { onDelete: 'restrict' }),
   aaId: uuid('aa_id').references(() => equipment.id, { onDelete: 'restrict' }),
   sourceId: uuid('source_id').references(() => sources.id, { onDelete: 'restrict' }),

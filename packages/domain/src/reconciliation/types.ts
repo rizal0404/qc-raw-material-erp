@@ -2,7 +2,7 @@ import type { AssignmentOrigin, Chemistry, MappingStatus, MaterialKind, Quality,
 
 export interface ReconciliationCandidateRecord {
   id:string; sampleId:string; materialKind:MaterialKind; operationDate:string; vendorId:string|null; vendorSnapshot:string|null;
-  sourceId:string|null; sourceSnapshot:string|null; block:string|null; typeGrade:string|null; chemistry:Chemistry; quality:Quality; matchMode:'VENDOR_ID'|'VENDOR_TEXT';
+  sourceId:string|null; sourceSnapshot:string|null; block:string|null; typeGrade:string|null; chemistry:Chemistry; quality:Quality; matchMode:'AM_ID'|'VENDOR_ID'|'VENDOR_TEXT';
 }
 
 export interface RetaseAllocationRecord {
@@ -16,7 +16,7 @@ export interface ReconciliationAssignmentRecord {
   assignmentId:string; assignmentOrigin:AssignmentOrigin; reportId:string|null; reportVersion:number|null; reportStatus:string; operationDate:string; shiftCode:ShiftCode;
   crusherId:string|null; crusherCode:string; crusherName:string; vendorId:string; vendorCode:string; vendorName:string;
   amId:string; amUnitNo:string; sourceId:string|null; sourceCode:string|null; sourceName:string|null; blockSnapshot:string|null;
-  materialKind:MaterialKind; materialCategory:string; assignedAaCount:number; aaWithDumpCount:number; observedRetase:number;
+  materialKind:MaterialKind; materialCategory:string; assignedAaCount:number; assignedAaUnitNos?:string[]; aaWithDumpCount:number; observedRetase:number;
   reservedRetase:number; consumedRetase:number; remainingRetase:number; reviewRequired:boolean; allocations:RetaseAllocationRecord[];
 }
 

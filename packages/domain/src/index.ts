@@ -27,3 +27,5 @@ export * from './reconciliation/ports';
 export * from './stockpile-map/types';
 export * from './stockpile-map/ports';
 export * from './stockpile-map/validation';
+export * from './crusher-report/validation';
+export * from './crusher-report/ports';

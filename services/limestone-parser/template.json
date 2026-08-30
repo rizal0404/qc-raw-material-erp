@@ -1,0 +1,23 @@
+{
+  "code": "tonasa-limestone-four-blocks", "version": "0.2.0", "width": 1600, "height": 2200,
+  "fields": {
+    "reportDate": [0.55, 0.040, 0.16, 0.021], "shiftCode": [0.574, 0.059, 0.11, 0.019],
+    "header.day": [0.293, 0.05, 0.12, 0.022], "header.operatorName": [0.292, 0.066, 0.17, 0.021],
+    "header.crusherCode": [0.634, 0.025, 0.045, 0.020],
+    "production.pileTon": [0.408, 0.826, 0.092, 0.019],
+    "production.fillerTon": [0.408, 0.845, 0.092, 0.017],
+    "production.totalTon": [0.408, 0.859, 0.092, 0.018],
+    "production.runningTimeHours": [0.416, 0.873, 0.08, 0.019],
+    "production.capacityTph": [0.416, 0.887, 0.084, 0.021],
+    "pile.baratPercent": [0.613, 0.827, 0.065, 0.017],
+    "pile.timurPercent": [0.613, 0.841, 0.065, 0.018],
+    "pile.totalPercent": [0.613, 0.855, 0.065, 0.019],
+    "notes.raw": [0.711, 0.096, 0.205, 0.343]
+  },
+  "blocks": [
+    {"key":"upper-left","vendorHint":"BATARA","dtX":[0.087,0.048],"totalX":[0.357,0.038],"rows":[0.108,0.341,17],"dtRowSearch":[0.086,0.353],"totalRowSearch":[0.109,0.356],"hourly":[0.132,0.344,0.224,0.031],"total":[0.353,0.37,0.05,0.038]},
+    {"key":"upper-right","vendorHint":"TOP","dtX":[0.427,0.043],"totalX":[0.678,0.035],"rows":[0.110,0.297,13],"dtRowSearch":[0.109,0.300],"totalRowSearch":[0.105,0.300],"hourly":[0.464,0.302,0.213,0.032],"total":[0.674,0.344,0.054,0.037]},
+    {"key":"lower-left","vendorHint":"UTSG","dtX":[0.090,0.043],"totalX":[0.357,0.038],"rows":[0.483,0.695,14],"dtRowSearch":[0.480,0.704],"totalRowSearch":[0.478,0.700],"hourly":[0.131,0.706,0.228,0.035],"total":[0.354,0.742,0.05,0.04]},
+    {"key":"lower-right","vendorHint":"AN NUR","dtX":[0.424,0.043],"totalX":[0.678,0.035],"rows":[0.474,0.636,11],"dtRowSearch":[0.475,0.643],"totalRowSearch":[0.474,0.640],"hourly":[0.463,0.645,0.216,0.033],"total":[0.674,0.677,0.054,0.039]}
+  ]
+}

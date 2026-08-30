@@ -13,6 +13,7 @@ export async function registerQcRoutes(app:FastifyInstance,service:QcService){
   const qcWrite={preHandler:app.auth.requireRoles('QC_ANALYST','SUPERVISOR_ADMIN')};
 
   app.get('/samples',qcRead,async(request)=>{const q=RawSampleListQuerySchema.parse(request.query);return{ok:true as const,...await service.listSamples(q)};});
+  app.get('/samples/next-number',qcRead,async()=>({ok:true as const,nextNumber:await service.nextSampleNumber()}));
   app.get('/samples/:id',qcRead,async(request)=>({ok:true as const,item:await service.getSample(param(request,'id'))}));
   app.post('/samples',qcWrite,async(request)=>({ok:true as const,item:await service.createSample(request.principal!,CreateRawSampleRequestSchema.parse(request.body),request.id)}));
   app.patch('/samples/:id',qcWrite,async(request)=>({ok:true as const,item:await service.updateSample(request.principal!,param(request,'id'),UpdateRawSampleRequestSchema.parse(request.body),request.id)}));

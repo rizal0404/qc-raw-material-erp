@@ -16,6 +16,7 @@ export interface ReconciliationRepository {
   listAssignmentEvents(assignmentId:string):Promise<Array<{id:string;eventTs:Date;aaUnitNo:string|null;delta:number;eventType:string;status:string;createdByName:string;reason:string|null}>>;
   getAllocation(id:string):Promise<RetaseAllocationRecord|null>;
   createAllocation(input:AllocationWriteInput):Promise<RetaseAllocationRecord>;
+  autoReserveSingleCandidate(input:{assignmentId:string;sampleId:string;observedRetase:number;createdBy:string}):Promise<{allocation:RetaseAllocationRecord;changed:boolean}|null>;
   updateAllocation(id:string,patch:{sampleId?:string|undefined;approvedRetase?:number|null|undefined;candidateCount?:number|undefined;note?:string|null|undefined;updatedBy:string}):Promise<RetaseAllocationRecord|null>;
   confirmAllocation(id:string,input:{approvedRetase:number;actorUserId:string;actorRoleSnapshot:string;reason?:string|null|undefined;requestId?:string|undefined}):Promise<RetaseAllocationRecord>;
   markReviewRequiredForDrift(operationDate:string):Promise<number>;

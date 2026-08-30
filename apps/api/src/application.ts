@@ -27,6 +27,9 @@ import { registerStockpileMapRoutes } from './modules/stockpile-map/routes';
 import { createStockpileMapService } from './modules/stockpile-map/service';
 import { registerClayReportRoutes } from './modules/clay-report/routes';
 import { createClayReportService } from './modules/clay-report/service';
+import { createCrusherReportRepository } from '@qc/db';
+import { createCrusherReportService } from './modules/crusher-report/service';
+import { registerCrusherReportRoutes } from './modules/crusher-report/routes';
 
 function isAllowedOrigin(config: AppConfig, origin: string | undefined): boolean {
   if (!origin) return true;
@@ -51,6 +54,7 @@ export async function buildApp(config: AppConfig) {
   const stockpileMapService = createStockpileMapService(stockpileMapRepository, masterRepository, qcRepository);
   const clayReportRepository = createClayReportRepository(database.db);
   const clayReportService = createClayReportService(clayReportRepository, masterRepository);
+  const crusherReportService = createCrusherReportService(createCrusherReportRepository(database.db), masterRepository);
   const authService = createAuthService({
     repository: iamRepository,
     passwordHasher: createArgonPasswordHasher({ pepper: config.auth.passwordPepper }),
@@ -131,6 +135,7 @@ export async function buildApp(config: AppConfig) {
     if (postgresCode === '23514') {
       const constraint=(error as {constraint_name?:string;cause?:{constraint_name?:string}}).constraint_name??(error as {cause?:{constraint_name?:string}}).cause?.constraint_name;
       const clayErrors:Record<string,string>={
+        crusher_photo_duplicate:'Retase DT pada tanggal/shift/crusher ini sudah tercatat dari sumber lain. Impor diblokir untuk mencegah hitung ganda; periksa rekonsiliasi.',
         clay_consumption_balance:'Retase Clay tidak cukup atau sudah dipakai mixing. Muat ulang retase; untuk mengurangi laporan, kurangi pemakaian melalui Replace Mix terlebih dahulu.',
         clay_consumption_context:'Kolom laporan Clay harus CONFIRMED, aktif, serta sesuai tanggal dan shift mixing. Periksa sumber retase yang dipilih.',
         clay_consumption_identity:'Identitas kolom Clay sudah dipakai mixing dan harus dipertahankan untuk riwayat. Buat kolom baru untuk sumber berbeda.',
@@ -166,9 +171,12 @@ export async function buildApp(config: AppConfig) {
     await registerReconciliationRoutes(v1, reconciliationService);
     await registerStockpileMapRoutes(v1, stockpileMapService);
     await registerClayReportRoutes(v1, clayReportService);
+    await registerCrusherReportRoutes(v1, crusherReportService);
+    await registerOreVisionRoutes(v1);
     // Next slices: operations-reporting/audit explorer.
   }, { prefix: '/api/v1' });
 
   app.addHook('onClose', async () => database.sql.end());
   return app;
 }
+import { registerOreVisionRoutes } from './modules/orevision/routes';

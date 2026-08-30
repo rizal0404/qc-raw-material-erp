@@ -130,6 +130,8 @@ export function createRetaseService(repository:RetaseEventRepository,master:Mast
       try{
         const created=await repository.appendEvent(writeFromResolution(input,principal,resolution,status,manual));return {item:eventDto(created,false),idempotent:false};
       }catch(error){
+        const code=(error as {code?:string;cause?:{code?:string}}).code??(error as {cause?:{code?:string}}).cause?.code;
+        if(code&&code!=='23505')throw error;
         // Concurrent retry can hit request_id UNIQUE after the first transaction commits.
         const raced=await repository.findByRequestId(input.requestId);if(raced){assertRecordIdempotency(raced,principal,input);return {item:eventDto(raced,false),idempotent:true};}throw error;
       }

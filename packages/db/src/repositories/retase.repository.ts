@@ -236,7 +236,7 @@ export function createRetaseRepository(db:PostgresJsDatabase<typeof Schema>):Ret
         db.execute(sql`SELECT vendor_id AS id,coalesce(max(vendor_name_snapshot),'UNASSIGNED') AS label,coalesce(sum(delta),0)::int AS retase FROM retase_events WHERE ${base} GROUP BY vendor_id ORDER BY label`),
         db.execute(sql`SELECT am_id AS id,coalesce(max(am_unit_no_snapshot),'UNASSIGNED') AS label,coalesce(sum(delta),0)::int AS retase FROM retase_events WHERE ${base} GROUP BY am_id ORDER BY label`),
         db.execute(sql`SELECT aa_id AS id,coalesce(max(aa_unit_no_snapshot),'UNKNOWN') AS label,coalesce(sum(delta),0)::int AS retase FROM retase_events WHERE ${base} GROUP BY aa_id,aa_unit_no_snapshot ORDER BY label`),
-        db.execute(sql`SELECT to_char(event_ts AT TIME ZONE 'Asia/Makassar','HH24')||':00' AS hour,coalesce(sum(delta),0)::int AS retase FROM retase_events WHERE ${base} GROUP BY 1 ORDER BY 1`),
+        db.execute(sql`SELECT to_char(event_ts AT TIME ZONE 'Asia/Makassar','HH24')||':00' AS hour,coalesce(sum(delta),0)::int AS retase FROM retase_events WHERE ${base} AND NOT(entry_source='IMPORT' AND material_kind='LS') GROUP BY 1 ORDER BY 1`),
       ]);
       const t=(totals as unknown as Array<Record<string,unknown>>)[0]??{};
       const bucket=(rows:any)=> (rows as Array<Record<string,unknown>>).map(r=>({id:nullable(r.id),label:str(r.label),retase:n(r.retase)}));

@@ -1,0 +1,901 @@
+/* Original OreVision review composition, using the application's mineral theme. */
+
+/* Mapping and verification live in the same review matrix as the tally cells. */
+.orevision-vendor-controls {
+  border-bottom: 1px solid var(--border);
+  background: #fff;
+  font-size: 10px;
+}
+.orevision-vendor-config {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  padding: 10px 12px 8px;
+  flex-wrap: wrap;
+}
+.orevision-vendor-config label {
+  flex: 1 1 100px;
+  min-width: 0;
+}
+.orevision-vendor-config label:nth-child(2) {
+  flex: 0 1 95px;
+}
+.orevision-vendor-config label span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+}
+.orevision .orevision-vendor-config input,
+.orevision .orevision-vendor-config select {
+  width: 100%;
+  font-size: 11px;
+  min-height: 30px;
+  padding: 5px;
+  box-sizing: border-box;
+}
+.orevision .orevision-vendor-config .btn {
+  font-size: 10px;
+  padding: 7px 8px;
+}
+.orevision-review-tools {
+  padding: 0 12px 8px;
+  max-height: 175px;
+  overflow: auto;
+}
+.orevision-review-tools summary {
+  cursor: pointer;
+  color: var(--accent);
+  padding: 3px 0;
+}
+.orevision-review-tools > label {
+  margin-top: 8px;
+}
+.orevision-review-tools > .btn {
+  margin: 5px 6px 0 0;
+}
+.orevision .orevision-unified-table {
+  min-width: 830px;
+}
+.orevision .orevision-unified-table input[type="checkbox"] {
+  appearance: auto;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  margin: 0;
+}
+.orevision-mapping-cell {
+  min-width: 190px;
+  width: 190px;
+  text-align: left;
+}
+.orevision-row-mapping {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.orevision .orevision-row-mapping select {
+  width: 180px;
+  font-size: 10px;
+  padding: 5px;
+  min-height: 28px;
+}
+.orevision-row-mapping small {
+  font-size: 9px;
+  color: var(--muted);
+}
+.orevision-row-mapping .orevision-engine-link {
+  font-size: 9px;
+}
+.orevision-review-cell {
+  min-width: 110px;
+  text-align: left;
+}
+.orevision-review-cell > label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.orevision-review-cell details {
+  font-size: 9px;
+  margin-top: 6px;
+  max-width: 160px;
+}
+.orevision-review-cell summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.orevision-review-cell details small,
+.orevision-review-cell details button {
+  display: block;
+  line-height: 1.6;
+}
+.orevision-reviewed-row > th {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.orevision .orevision-review-status {
+  padding: 16px 20px;
+}
+.orevision-review-status p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.orevision .orevision-mapping-dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+}
+.orevision .orevision-mapping-dialog p {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.orevision .orevision-mapping-dialog select,
+.orevision .orevision-mapping-dialog input {
+  width: 100%;
+  min-height: 36px;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 7px;
+}
+.orevision-register-dt,
+.orevision-new-assignment {
+  background: #f6f9f7;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+.orevision-new-assignment legend {
+  padding: 0 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.orevision-mapping-dialog .form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 560px) {
+  .orevision-mapping-dialog .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .orevision .orevision-matrix-footer .inline-actions {
+    flex-wrap: wrap;
+  }
+}
+
+.orevision .photo-source-tools strong > small {
+  display: inline;
+}
+.orevision .orevision-capacity-check strong {
+  display: inline;
+  font-size: 10px;
+  margin-left: 5px;
+}
+.orevision .orevision-vendor-tabs button[aria-selected="true"] small {
+  color: white;
+}
+.orevision [hidden] {
+  display: none !important;
+}
+.orevision-review {
+  container-type: inline-size;
+  display: grid;
+  gap: 20px;
+}
+.orevision .orevision-review-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 22px;
+}
+.orevision-report-title {
+  flex: 1;
+  min-width: 0;
+}
+.orevision-report-title .eyebrow {
+  color: var(--accent);
+  font-size: 10px;
+}
+.orevision-report-title h3 {
+  margin: 7px 0 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.orevision-report-title > small {
+  display: block;
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.orevision-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid currentColor;
+  border-radius: 9px;
+  font-size: 11px;
+}
+.orevision .balanced {
+  color: var(--accent, #157568);
+}
+.orevision .unbalanced {
+  color: #945400;
+}
+.orevision-balance.balanced {
+  background: var(--accent-soft);
+  border-color: #b7d8ce;
+}
+.orevision-balance.unbalanced {
+  background: #fff8e8;
+  border-color: #ead5a8;
+}
+.orevision-report-context {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  padding-left: 24px;
+  border-left: 1px solid var(--border);
+}
+.orevision-report-context label {
+  font-size: 10px;
+  color: var(--muted);
+}
+.orevision-report-context label:last-child {
+  grid-column: 1 / -1;
+}
+.orevision-report-context input,
+.orevision-report-context select {
+  width: 100%;
+}
+.orevision .orevision-review .photo-review-layout {
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  gap: 20px;
+  align-items: stretch;
+  --review-height: clamp(490px, 66vh, 680px);
+}
+.orevision .orevision-review .photo-source,
+.orevision .orevision-matrix-panel {
+  padding: 0;
+  margin: 0;
+  height: var(--review-height);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.orevision .orevision-review .photo-source {
+  position: relative;
+  top: auto;
+}
+.orevision .orevision-review .photo-source-tools {
+  padding: 11px 12px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+  min-height: 57px;
+  box-sizing: border-box;
+}
+.orevision .photo-source-tools strong {
+  white-space: nowrap;
+  font-size: 11px;
+}
+.orevision .photo-source-tools strong small {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 10px;
+}
+.orevision-preview-controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.orevision-preview-controls label,
+.orevision-preview-controls .btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: #f3f7f5;
+  border-radius: 7px;
+  color: var(--ink);
+  cursor: pointer;
+  margin: 0;
+  font-size: 16px;
+}
+.orevision-preview-controls label input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+.orevision-preview-controls label:has(:checked) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.orevision-preview-controls label:has(:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.orevision .orevision-review .photo-source-scroll {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  border-radius: 0;
+  padding: 16px;
+  background: #eff3f1;
+  align-content: center;
+}
+.orevision-source-footer,
+.orevision-matrix-footer {
+  min-height: 49px;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+  background: #fff;
+}
+.orevision-source-footer > span,
+.orevision-matrix-footer > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.orevision-source-footer > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.orevision-engine-link {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  font-size: 10px;
+  padding: 5px 0;
+  cursor: pointer;
+  text-align: left;
+}
+.orevision-source-footer .orevision-engine-link {
+  flex-shrink: 0;
+}
+.orevision-source-evidence {
+  position: absolute;
+  bottom: 49px;
+  left: 0;
+  right: 0;
+  padding: 10px;
+  background: #fffffff5;
+  border-top: 1px solid var(--border);
+  max-height: 170px;
+  overflow: auto;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+  z-index: 3;
+}
+.orevision-source-evidence .photo-focused-crop {
+  margin-top: 6px;
+}
+.orevision-vendor-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  min-height: 66px;
+  box-sizing: border-box;
+}
+.orevision-vendor-tabs {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+.orevision-vendor-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  flex: 1 0 86px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: #f0f4f2;
+  color: var(--ink);
+  padding: 7px 9px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+.orevision-vendor-tabs button > span {
+  white-space: normal;
+  line-height: 1.4;
+}
+.orevision-vendor-tabs button b {
+  font:
+    600 10px/1.2 ui-monospace,
+    monospace;
+  background: #e2ebe6;
+  padding: 3px 5px;
+  border-radius: 5px;
+}
+.orevision-vendor-tabs button small {
+  display: block;
+  font-size: 8px;
+}
+.orevision-vendor-tabs button[aria-selected="true"] {
+  background: var(--accent);
+  color: white;
+}
+.orevision-vendor-tabs button[aria-selected="true"] b {
+  background: #ffffff26;
+}
+.orevision-unit-count {
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+  flex: 0 0 62px;
+  line-height: 1.6;
+}
+.orevision-matrix-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-color: #bacac2 #f3f7f5;
+  scrollbar-width: thin;
+}
+.orevision-tally-table {
+  width: 100%;
+  min-width: 550px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 11px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.orevision-tally-table th,
+.orevision-tally-table td {
+  padding: 7px 5px;
+  border-bottom: 1px solid #edf1ef;
+  height: 40px;
+  box-sizing: border-box;
+}
+.orevision-tally-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f5f8f6;
+  color: var(--muted);
+  font-size: 9px;
+  height: 32px;
+  font-weight: 700;
+}
+.orevision-tally-table thead th:first-child {
+  left: 0;
+  z-index: 4;
+}
+.orevision-tally-table tbody th {
+  position: sticky;
+  left: 0;
+  background: white;
+  z-index: 1;
+  width: 76px;
+}
+.orevision-tally-table tbody tr:hover td,
+.orevision-tally-table tbody tr:hover th {
+  background: #f7faf8;
+}
+.orevision .orevision-tally-table input {
+  width: 38px;
+  height: 25px;
+  padding: 2px;
+  border-radius: 4px;
+  font:
+    11px ui-monospace,
+    monospace;
+  text-align: center;
+  appearance: textfield;
+  background: #fafcfb;
+}
+.orevision .orevision-tally-table input::-webkit-inner-spin-button,
+.orevision .orevision-tally-table input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.orevision .orevision-tally-table th input {
+  width: 52px;
+  color: var(--accent);
+  font-weight: 700;
+  background: #f0f5f2;
+}
+.orevision .orevision-tally-table input.has-tally {
+  background: #edf8f3;
+  border-color: #b7d8ce;
+  color: #126349;
+  font-weight: 600;
+}
+.orevision .orevision-tally-table input.zero {
+  color: #96a49d;
+}
+.orevision .orevision-tally-table input.missing {
+  border-style: dashed;
+}
+.orevision .orevision-tally-table input.orevision-row-total {
+  background: transparent;
+  border-color: transparent;
+  font-weight: 700;
+  width: 46px;
+}
+.orevision .orevision-tally-table input.orevision-row-total:focus {
+  border-color: var(--accent);
+}
+.orevision-row-check {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f2f6f3;
+  font-size: 10px;
+  font-weight: bold;
+}
+.orevision-tally-table tfoot th,
+.orevision-tally-table tfoot td {
+  position: sticky;
+  bottom: 0;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+  border-top: 1px solid #c6dcd1;
+  z-index: 2;
+}
+.orevision-tally-table tfoot th {
+  left: 0;
+  z-index: 4;
+  font-size: 9px;
+}
+.orevision-tally-table tfoot .orevision-total-mismatch {
+  color: #945400;
+}
+.orevision .orevision-matrix-footer {
+  flex-wrap: wrap;
+}
+.orevision .orevision-matrix-footer .inline-actions {
+  gap: 10px;
+}
+.orevision .orevision-matrix-footer .btn {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 10px;
+  padding: 7px 10px;
+}
+.orevision .orevision-tally-table td.orevision-warning-cell,
+.orevision .orevision-tally-table th.orevision-warning-cell {
+  background: #fff3cd !important;
+  color: #8a5a00;
+}
+.orevision .orevision-tally-table input.orevision-warning-cell {
+  background: #fff8df !important;
+  border-color: #e4b949;
+  color: #8a5a00;
+}
+.orevision .orevision-tally-table tbody tr.orevision-blocking-row > th,
+.orevision .orevision-tally-table tbody tr.orevision-blocking-row > td,
+.orevision .orevision-tally-table td.orevision-blocking-cell,
+.orevision .orevision-tally-table th.orevision-blocking-cell {
+  background: #fce7ef !important;
+  color: #9b1c4a;
+}
+.orevision .orevision-tally-table input.orevision-blocking-cell {
+  background: #fff1f5 !important;
+  border-color: #e7a4bb;
+  color: #9b1c4a;
+}
+.orevision .orevision-tally-table .orevision-warning-cell,
+.orevision .orevision-tally-table .orevision-blocking-cell {
+  font-weight: 700;
+}
+.orevision-review-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.orevision-review-summary > .card {
+  min-width: 0;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+.orevision-review-summary header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.orevision-review-summary h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.orevision-review-summary h3 svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.orevision-review-summary header > span {
+  white-space: nowrap;
+  font-size: 10px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: #f0f4f2;
+}
+.orevision-review-summary header > small {
+  font-size: 9px;
+  color: var(--muted);
+  text-align: right;
+}
+.orevision-log-list {
+  max-height: 192px;
+  min-height: 160px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 6px;
+}
+.orevision-log-list > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  background: #f9fbfa;
+  border-radius: 8px;
+  font-size: 11px;
+}
+.orevision-log-list time {
+  flex: 0 0 96px;
+  color: var(--accent);
+  font:
+    600 10px ui-monospace,
+    monospace;
+}
+.orevision-log-list p {
+  margin: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.orevision-log-type {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+.orevision-log-type.info {
+  background: #edf3fc;
+  color: #38649d;
+}
+.orevision-log-type.warning {
+  background: #fff0c6;
+  color: #8b6300;
+}
+.orevision-log-type.stop {
+  background: #fae6e6;
+  color: #a33939;
+}
+.orevision-production-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  flex: 1;
+}
+.orevision-production-metrics > div {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  padding: 12px 6px;
+  background: #f6f9f7;
+  text-align: center;
+}
+.orevision-production-metrics span {
+  font-size: 11px;
+  color: var(--muted);
+  max-width: 65px;
+  line-height: 1.5;
+}
+.orevision-production-metrics strong {
+  font-size: 20px;
+  color: var(--ink);
+}
+.orevision-production-metrics > div:nth-child(3) strong {
+  color: var(--accent);
+}
+.orevision-production-metrics small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.orevision-capacity-check {
+  font-size: 10px;
+  line-height: 1.8;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 14px 0 0;
+}
+.orevision-review-details {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  min-width: 0;
+  scroll-margin-top: 24px;
+}
+.orevision-review-details > summary {
+  padding: 18px 20px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--ink);
+}
+.orevision-review-details > summary span {
+  margin-left: 12px;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.orevision .orevision-review-details > .photo-fields {
+  padding: 4px 20px 20px;
+}
+.orevision-demo-paper {
+  background: #fff8df;
+  color: #343427;
+  border: 1px solid #e4dabb;
+  border-radius: 6px;
+  padding: 14px 12px;
+  font:
+    8px/1.5 ui-monospace,
+    monospace;
+  box-shadow: 0 3px 8px #253b2e10;
+}
+.orevision-demo-paper > small {
+  display: block;
+  color: #907345;
+  font-size: 7px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+.orevision-demo-paper h4 {
+  text-align: center;
+  font-size: 9px;
+  line-height: 1.5;
+  margin: 3px 0;
+}
+.orevision-demo-paper p {
+  font-size: 7px;
+  margin: 8px 0;
+}
+.orevision-paper-vendor {
+  display: flex;
+  justify-content: space-between;
+  gap: 5px;
+  padding: 5px;
+  border: 1px solid #aea78c;
+  font-size: 7px;
+}
+.orevision-demo-paper table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: center;
+  font-size: 7px;
+  margin-bottom: 10px;
+}
+.orevision-demo-paper td,
+.orevision-demo-paper th {
+  padding: 1px 2px;
+  border-bottom: 1px solid #e1d8b8;
+}
+.orevision-demo-paper th {
+  background: #faefc5;
+}
+.orevision-demo-paper td {
+  height: 13px;
+}
+.orevision-demo-paper td:not(:first-child):not(:last-child) {
+  color: #777d83;
+  letter-spacing: 1px;
+}
+.orevision-model-discovery select {
+  width: 100%;
+  max-width: 100%;
+  font: inherit;
+  font-size: 12px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+@container (max-width: 860px) {
+  .orevision .orevision-review-header {
+    gap: 16px;
+  }
+  .orevision-report-context {
+    padding-left: 16px;
+  }
+  .orevision .orevision-review .photo-review-layout {
+    gap: 14px;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  }
+  .orevision-review-summary {
+    gap: 14px;
+  }
+  .orevision-review-summary > .card {
+    padding: 14px;
+  }
+  .orevision-log-list time {
+    flex-basis: 74px;
+    font-size: 9px;
+  }
+  .orevision-production-metrics {
+    gap: 6px;
+  }
+  .orevision-production-metrics strong {
+    font-size: 17px;
+  }
+}
+@container (max-width: 680px) {
+  .orevision .orevision-review-header {
+    display: grid;
+    padding: 16px;
+  }
+  .orevision-report-context {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    padding: 14px 0 0;
+  }
+  .orevision .orevision-review .photo-review-layout {
+    grid-template-columns: 1fr;
+    --review-height: 500px;
+  }
+  .orevision .orevision-review .photo-source {
+    height: 420px;
+  }
+  .orevision-review-summary {
+    grid-template-columns: 1fr;
+  }
+  .orevision-review-details > summary span {
+    display: block;
+    margin: 8px 0 0;
+  }
+  .orevision .orevision-review-details > .photo-fields {
+    padding: 4px 10px 10px;
+  }
+  .orevision-demo-canvas {
+    max-width: none;
+  }
+}

@@ -22,7 +22,7 @@ export function workflowNavigation(role: Role, material: MaterialKind): NavItem[
   const items: NavItem[] = [];
   if (material === 'CL' && role !== 'VENDOR') items.push({ to: '/clay-report', label: 'Laporan Crusher', icon: 'report' });
   if (role !== 'CRUSHER_OPERATOR') items.push({ to: '/vendor-shift-report', label: material === 'CL' ? 'Laporan Vendor · opsional' : 'Laporan Shift Vendor', icon: 'truck' });
-  if (material === 'LS' && (role === 'CRUSHER_OPERATOR' || role === 'SUPERVISOR_ADMIN')) items.push({ to: '/retase-counter', label: 'Retase Counter', icon: 'truck' });
+  if (material === 'LS' && role !== 'VENDOR') items.push({ to: '/retase-counter', label: role === 'QC_ANALYST' ? 'Retase · Laporan Foto' : 'Retase Counter', icon: 'truck' });
   if (role === 'QC_ANALYST' || role === 'SUPERVISOR_ADMIN') items.push(
     { to: '/raw-samples', label: 'Sampel Laboratorium', icon: 'sample' },
     ...(material === 'LS' ? [{ to: '/reconciliation', label: 'Rekonsiliasi Retase', icon: 'reconcile' } as NavItem] : []),

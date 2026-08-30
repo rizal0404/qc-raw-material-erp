@@ -15,6 +15,7 @@ export interface SaveMixRepositoryInput {
 export interface QcRepository {
   listClayWorkbenchSources(operationDate: string, shiftCode: string): Promise<ClayWorkbenchSource[]>;
   listRawSamples(filter: RawSampleFilter): Promise<{ items: RawSampleRecord[]; total: number }>;
+  nextRawSampleNumber(): Promise<number>;
   findRawSampleById(id: string): Promise<RawSampleRecord | null>;
   findRawSampleBySampleId(sampleId: string): Promise<RawSampleRecord | null>;
   createRawSample(input: RawSampleWriteInput): Promise<RawSampleRecord>;

@@ -8,7 +8,7 @@ export const reportStatusEnum = pgEnum('shift_report_status', ['DRAFT','SUBMITTE
 export const assignmentStatusEnum = pgEnum('assignment_status', ['ACTIVE','CLOSED','CANCELLED']);
 export const retaseEventTypeEnum = pgEnum('retase_event_type', ['DUMP','REVERSAL','MANUAL_CORRECTION']);
 export const retaseEventStatusEnum = pgEnum('retase_event_status', ['VALID','EXCEPTION_UNASSIGNED','AMBIGUOUS','REVERSED']);
-export const mappingStatusEnum = pgEnum('mapping_status', ['UNMAPPED','SUGGESTED','AMBIGUOUS','CONFIRMED','CONSUMED','REVIEW_REQUIRED']);
+export const mappingStatusEnum = pgEnum('mapping_status', ['UNMAPPED','SUGGESTED','RESERVED','AMBIGUOUS','CONFIRMED','CONSUMED','REVIEW_REQUIRED']);
 export const mixStatusEnum = pgEnum('mix_status', ['ACTIVE','REPLACED','VOID']);
 
 export const tonPerRetaseRuleTypeEnum = pgEnum('ton_per_retase_rule_type', ['DEFAULT','MATCH_KEY']);

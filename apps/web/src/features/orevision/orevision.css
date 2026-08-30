@@ -1,0 +1,625 @@
+.photo-intro,
+.photo-upload,
+.photo-history,
+.photo-status,
+.photo-source-tools,
+.photo-vendor-heading {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.photo-intro {
+  justify-content: space-between;
+}
+.photo-intro p,
+.photo-help {
+  color: var(--text-muted, #667085);
+}
+.photo-upload {
+  padding: 1.2rem;
+}
+.photo-upload label {
+  flex: 1;
+  min-width: 220px;
+}
+.photo-history select {
+  min-width: 300px;
+  max-width: 100%;
+}
+.photo-delete {
+  color: #b42318;
+  border-color: #fda29b;
+  background: #fff5f4;
+}
+.photo-delete:hover:not(:disabled) {
+  background: #fee4e2;
+}
+.photo-review-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.8fr) minmax(560px, 1.2fr);
+  gap: 1rem;
+  align-items: start;
+}
+.photo-source {
+  position: sticky;
+  top: 1rem;
+  padding: 0.85rem;
+  min-width: 0;
+}
+.photo-source-tools {
+  gap: 0.5rem;
+  padding-bottom: 0.8rem;
+}
+.photo-source-tools label,
+.photo-confirm-check,
+.photo-filter,
+.photo-row-review {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.photo-source-tools input,
+.photo-confirm-check input,
+.photo-filter input,
+.photo-row-review input {
+  width: auto;
+}
+.photo-source-scroll {
+  height: 72vh;
+  overflow: auto;
+  background: #e8ecf1;
+  border-radius: 8px;
+}
+.photo-image-canvas {
+  position: relative;
+  min-width: 100%;
+}
+.photo-image-canvas img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.photo-bbox {
+  position: absolute;
+  border: 3px solid #ef9e12;
+  background: #ffcd4040;
+  pointer-events: none;
+}
+.photo-fields {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.photo-fields > .card {
+  padding: 1rem;
+}
+.photo-vendor-heading {
+  align-items: flex-end;
+  margin-bottom: 0.75rem;
+}
+.photo-vendor-heading label {
+  flex: 1;
+  min-width: 125px;
+}
+.photo-vendor-heading small {
+  width: 100%;
+}
+.photo-vehicle-table input {
+  min-width: 62px;
+  max-width: 110px;
+}
+.photo-vehicle-table select {
+  min-width: 200px;
+  max-width: 270px;
+}
+.photo-vehicle-table td {
+  padding: 0.5rem;
+}
+.photo-row-review {
+  font-size: 0.75rem;
+  flex-wrap: wrap;
+  min-width: 100px;
+}
+.photo-hourly {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(48px, 1fr));
+  gap: 0.4rem;
+  margin: 1rem 0;
+  overflow: auto;
+}
+.photo-hourly input {
+  width: 100%;
+  min-width: 48px;
+}
+.photo-hourly label {
+  font-size: 0.75rem;
+}
+.photo-confirm-check {
+  align-items: flex-start;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+}
+.photo-issue {
+  border: 0;
+  background: none;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.3rem 0;
+}
+.photo-issue-warning,
+.photo-issue-blocking {
+  border-radius: 5px;
+  padding: 0.35rem 0.5rem;
+  margin: 0.1rem 0;
+}
+.photo-issue-warning {
+  color: #8a5a00;
+  background: #fff3cd;
+}
+.photo-issue-blocking {
+  color: #9b1c4a;
+  background: #fce7ef;
+}
+.photo-validation ul {
+  max-height: 250px;
+  overflow: auto;
+  padding-left: 1.2rem;
+}
+.photo-fields textarea {
+  width: 100%;
+}
+.retase-view-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.photo-report label > span {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+.photo-status {
+  padding: 0.75rem;
+}
+.photo-source > small {
+  display: block;
+  overflow-wrap: anywhere;
+  margin-top: 0.5rem;
+}
+@media (max-width: 1150px) {
+  .photo-review-layout {
+    grid-template-columns: 1fr;
+  }
+  .photo-source {
+    position: static;
+  }
+  .photo-source-scroll {
+    height: 55vh;
+  }
+}
+@media (max-width: 600px) {
+  .photo-hourly {
+    grid-template-columns: repeat(4, minmax(48px, 1fr));
+  }
+  .photo-upload label,
+  .photo-history select {
+    min-width: 0;
+    width: 100%;
+  }
+  .photo-history {
+    display: block;
+  }
+}
+.photo-row-scores {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 165px;
+}
+.photo-row-scores > small {
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+.photo-crop-warning {
+  color: #945400;
+}
+.photo-polygon {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.photo-polygon polygon {
+  fill: #ffcd4020;
+  stroke: #b36100;
+  stroke-width: 2px;
+  vector-effect: non-scaling-stroke;
+}
+.photo-focused-crop {
+  margin-top: 0.75rem;
+  padding: 0.65rem;
+  border: 1px solid #d5dce3;
+  border-radius: 8px;
+  background: #f4f6f8;
+}
+.photo-focused-crop > span {
+  font-size: 0.75rem;
+  color: #475467;
+  display: block;
+  margin-bottom: 0.4rem;
+}
+.photo-focused-crop svg {
+  display: block;
+  width: 100%;
+  height: 100px;
+  background: white;
+}
+.photo-score-filter select {
+  width: 100%;
+  max-width: 380px;
+}
+.orevision {
+  min-width: 0;
+  color: var(--ink, #203a37);
+}
+.orevision .card {
+  border-color: var(--border, #e0e7e5);
+  box-shadow: 0 2px 4px #203a3704;
+}
+.orevision .photo-intro {
+  border-top: 3px solid var(--accent, #157568);
+  background: linear-gradient(110deg, #fff, var(--accent-soft, #eaf4f0));
+}
+.orevision .photo-intro h2 {
+  font-size: 20px;
+  margin: 4px 0 8px;
+  letter-spacing: -0.025em;
+}
+.orevision .photo-intro p {
+  max-width: 680px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.orevision .inline-actions {
+  flex-wrap: wrap;
+}
+.orevision-tabs {
+  display: flex;
+  gap: 5px;
+  padding: 5px;
+  background: var(--accent-soft, #eaf4f0);
+  border: 1px solid var(--border, #e0e7e5);
+  border-radius: 10px;
+  overflow-x: auto;
+}
+.orevision-tabs button {
+  flex: 1;
+  min-width: max-content;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted, #74817f);
+  padding: 11px 16px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.orevision-tabs button.active {
+  background: var(--accent, #157568);
+  color: white;
+  box-shadow: 0 2px 4px #203a3712;
+}
+.orevision-tabs button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.orevision .photo-review-layout {
+  grid-template-columns: minmax(280px, 0.72fr) minmax(0, 1.28fr);
+}
+.orevision .photo-fields {
+  padding: 0;
+  margin: 0;
+  max-width: none;
+}
+.orevision .photo-upload {
+  border-style: dashed;
+}
+.orevision .photo-upload > span {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: var(--muted, #74817f);
+}
+.photo-crop-preflight {
+  flex: 1 0 100%;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border, #d9e4e1);
+  border-radius: 10px;
+  background: #f8fbfa;
+}
+.photo-crop-heading,
+.photo-crop-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.photo-crop-heading > div {
+  display: grid;
+  gap: 3px;
+}
+.photo-crop-heading small,
+.photo-crop-confirm small {
+  color: var(--muted, #667b77);
+  overflow-wrap: anywhere;
+}
+.photo-crop-workspace {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.35fr) minmax(220px, 0.65fr);
+  gap: 14px;
+  align-items: start;
+  margin: 12px 0;
+}
+.photo-crop-stage {
+  position: relative;
+  overflow: hidden;
+  width: fit-content;
+  max-width: 100%;
+  max-height: 56vh;
+  border-radius: 8px;
+  background: #17201f;
+  line-height: 0;
+}
+.photo-crop-stage img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 56vh;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.photo-crop-selection {
+  position: absolute;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-width: 5%;
+  min-height: 5%;
+  border: 2px solid #f6b73c;
+  border-radius: 4px;
+  box-shadow: 0 0 0 9999px #101c1a99;
+  color: #17201f;
+  background:
+    linear-gradient(#ffffff1f, #ffffff1f),
+    linear-gradient(90deg, transparent 33%, #ffffff66 33% 34%, transparent 34% 66%, #ffffff66 66% 67%, transparent 67%),
+    linear-gradient(transparent 33%, #ffffff66 33% 34%, transparent 34% 66%, #ffffff66 66% 67%, transparent 67%);
+  cursor: move;
+  touch-action: none;
+  line-height: 1.2;
+}
+.photo-crop-selection span {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #ffd987e6;
+  font-size: 10px;
+  font-weight: 800;
+  pointer-events: none;
+}
+.photo-crop-controls {
+  display: grid;
+  gap: 10px;
+}
+.photo-crop-controls > label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.photo-crop-controls > label > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.photo-crop-controls input[type="range"] {
+  width: 100%;
+  accent-color: #bf7b00;
+}
+.photo-crop-actions,
+.photo-crop-confirm .inline-actions {
+  justify-content: flex-end;
+}
+@media (max-width: 760px) {
+  .photo-crop-workspace {
+    grid-template-columns: 1fr;
+  }
+  .photo-crop-heading,
+  .photo-crop-confirm {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .photo-crop-confirm .inline-actions {
+    width: 100%;
+  }
+}
+.orevision input:not([type="checkbox"]):not([type="file"]),
+.orevision select,
+.orevision textarea,
+.orevision-settings input {
+  border: 1px solid var(--border, #e0e7e5);
+  border-radius: 7px;
+  background: #fff;
+  padding: 8px;
+  color: var(--ink, #203a37);
+  font: inherit;
+  font-size: 12px;
+  min-width: 0;
+  max-width: 100%;
+}
+.orevision input:focus-visible,
+.orevision select:focus-visible,
+.orevision textarea:focus-visible {
+  outline: 2px solid var(--accent, #157568);
+  outline-offset: 1px;
+}
+.orevision input:disabled,
+.orevision select:disabled,
+.orevision textarea:disabled {
+  background: #f5f7f7;
+  opacity: 0.7;
+}
+.orevision .photo-vehicle-table {
+  min-width: 1080px;
+  font-variant-numeric: tabular-nums;
+}
+.orevision .photo-vehicle-table input {
+  width: 70px;
+}
+.orevision .photo-vehicle-table th:first-child,
+.orevision .photo-vehicle-table td:first-child {
+  position: sticky;
+  left: 0;
+  background: #f5f7f7;
+  z-index: 1;
+}
+.orevision .photo-source-tools {
+  font-size: 11px;
+  gap: 8px;
+}
+.orevision .photo-source-scroll {
+  background: #eaf0ee;
+}
+.orevision-grid-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-image:
+    linear-gradient(#15756855 1px, transparent 1px),
+    linear-gradient(90deg, #15756855 1px, transparent 1px);
+  background-size: 8.333% 5%;
+}
+.orevision-provider-grid,
+.orevision-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.orevision-provider-grid .btn {
+  font-size: 11px;
+}
+.orevision-settings p {
+  font-size: 12px;
+  color: var(--muted, #74817f);
+  line-height: 1.6;
+  margin: 0;
+}
+.orevision-settings .inline-actions {
+  flex-wrap: wrap;
+}
+.orevision-kpis strong {
+  font-size: 25px;
+  color: var(--accent, #157568);
+  overflow-wrap: anywhere;
+}
+.orevision-bars {
+  display: grid;
+  gap: 20px;
+}
+.orevision-bars span {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+.orevision-bars meter {
+  width: 100%;
+  height: 20px;
+  accent-color: var(--accent, #157568);
+}
+.orevision-bars meter::-webkit-meter-optimum-value {
+  background: var(--accent, #157568);
+}
+.orevision-hour-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  min-height: 180px;
+  overflow-x: auto;
+  padding: 14px 0;
+}
+.orevision-hour-chart > div {
+  flex: 1;
+  min-width: 58px;
+  text-align: center;
+  font-size: 11px;
+}
+.orevision-hour-chart > div > div {
+  border-radius: 6px 6px 0 0;
+  background: var(--accent, #157568);
+  color: #fff;
+  min-height: 20px;
+  padding-top: 3px;
+  margin-bottom: 8px;
+}
+.orevision-json {
+  background: #f3f7f5;
+  border: 1px solid var(--border, #e0e7e5);
+  padding: 16px;
+  border-radius: 8px;
+  max-height: 500px;
+  overflow: auto;
+  font:
+    11px/1.6 ui-monospace,
+    monospace;
+}
+.orevision-logs {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  max-height: 320px;
+  overflow: auto;
+}
+.orevision-logs > div {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr) 85px auto;
+  gap: 6px;
+}
+.orevision-discrepancies {
+  color: #945400;
+  font-size: 12px;
+  max-height: 180px;
+  overflow: auto;
+}
+@media (max-width: 1150px) {
+  .orevision .photo-review-layout {
+    grid-template-columns: 1fr;
+  }
+  .orevision-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .orevision .photo-intro {
+    padding: 14px;
+  }
+  .orevision-tabs button {
+    font-size: 11px;
+    padding: 9px 12px;
+  }
+  .orevision-logs > div {
+    grid-template-columns: 1fr 1fr;
+  }
+  .orevision-provider-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .orevision .photo-history {
+    display: grid;
+    gap: 8px;
+  }
+  .orevision-kpis strong {
+    font-size: 20px;
+  }
+}

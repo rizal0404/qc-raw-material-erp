@@ -1,31 +1,37 @@
-import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
-import { forbidden } from '../../lib/errors';
-import { registerMasterRoutes } from './routes';
-import { describe, expect, it, vi } from 'vitest';
-import type { AuthPrincipal, MasterRepository } from '@qc/domain';
-import { createMasterService } from './service';
+import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
+import { forbidden } from "../../lib/errors";
+import { registerMasterRoutes } from "./routes";
+import { describe, expect, it, vi } from "vitest";
+import type { AuthPrincipal, MasterRepository } from "@qc/domain";
+import { createMasterService } from "./service";
 
 const actor: AuthPrincipal = {
-  sessionId: '10000000-0000-4000-8000-000000000001',
-  userId: '10000000-0000-4000-8000-000000000002',
-  username: 'admin',
-  displayName: 'Admin',
-  role: 'SUPERVISOR_ADMIN',
+  sessionId: "10000000-0000-4000-8000-000000000001",
+  userId: "10000000-0000-4000-8000-000000000002",
+  username: "admin",
+  displayName: "Admin",
+  role: "SUPERVISOR_ADMIN",
   vendorId: null,
-  status: 'ACTIVE',
+  status: "ACTIVE",
   crusherIds: [],
   lastLoginAt: null,
   sessionExpiresAt: new Date(Date.now() + 60_000),
   sessionLastSeenAt: new Date(),
 };
 
-const now = new Date('2026-08-20T00:00:00.000Z');
+const now = new Date("2026-08-20T00:00:00.000Z");
 function repo(overrides: Partial<MasterRepository> = {}): MasterRepository {
   const defaults: Partial<MasterRepository> = {
     findVendorByCode: async () => null,
     findVendorByAlias: async () => null,
     findVendorById: async () => null,
-    createVendor: async (input) => ({ id: '20000000-0000-4000-8000-000000000001', ...input, active: true, createdAt: now, updatedAt: now }),
+    createVendor: async (input) => ({
+      id: "20000000-0000-4000-8000-000000000001",
+      ...input,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    }),
     updateVendor: async () => null,
     listVendors: async () => ({ items: [], total: 0 }),
     listPlants: async () => ({ items: [], total: 0 }),
@@ -34,79 +40,333 @@ function repo(overrides: Partial<MasterRepository> = {}): MasterRepository {
     listPiles: async () => ({ items: [], total: 0 }),
     listEquipment: async () => ({ items: [], total: 0 }),
     listShifts: async () => [],
-    listMaterialCategories: async () => ['PILE', 'FILLER'],
+    listMaterialCategories: async () => ["PILE", "FILLER"],
     appendAudit: async () => undefined,
   };
   return { ...defaults, ...overrides } as MasterRepository;
 }
 
-describe('Master service', () => {
-  it('canonicalizes vendor code and writes audit', async () => {
-    const createVendor = vi.fn(async (input) => ({ id: '20000000-0000-4000-8000-000000000001', ...input, active: true, createdAt: now, updatedAt: now }));
+describe("Master service", () => {
+  it("canonicalizes vendor code and writes audit", async () => {
+    const createVendor = vi.fn(async (input) => ({
+      id: "20000000-0000-4000-8000-000000000001",
+      ...input,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    }));
     const appendAudit = vi.fn(async () => undefined);
     const service = createMasterService(repo({ createVendor, appendAudit }));
-    const result = await service.createVendor(actor, { code: 'pt topabiring', name: 'PT Topabiring', aliases: [], contactEmail: null, materialKinds:['LS','CL'] }, 'req-1');
-    expect(result.code).toBe('PT_TOPABIRING');
-    expect(createVendor).toHaveBeenCalledWith(expect.objectContaining({ code: 'PT_TOPABIRING' }));
-    expect(appendAudit).toHaveBeenCalledWith(expect.objectContaining({ action: 'MASTER_VENDOR_CREATED', entityType: 'VENDOR' }));
+    const result = await service.createVendor(
+      actor,
+      {
+        code: "pt topabiring",
+        name: "PT Topabiring",
+        aliases: [],
+        contactEmail: null,
+        materialKinds: ["LS", "CL"],
+      },
+      "req-1",
+    );
+    expect(result.code).toBe("PT_TOPABIRING");
+    expect(createVendor).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "PT_TOPABIRING" }),
+    );
+    expect(appendAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "MASTER_VENDOR_CREATED",
+        entityType: "VENDOR",
+      }),
+    );
   });
 
-  it('requires reason when active status changes', async () => {
-    const service = createMasterService(repo({
-      findVendorById: async () => ({ id: '20000000-0000-4000-8000-000000000001', code: 'V1', name: 'Vendor 1', aliases: [], contactEmail: null, materialKinds:['LS','CL'], active: true, createdAt: now, updatedAt: now }),
-    }));
-    await expect(service.updateVendor(actor, '20000000-0000-4000-8000-000000000001', { active: false })).rejects.toMatchObject({ code: 'REASON_REQUIRED' });
+  it("requires reason when active status changes", async () => {
+    const service = createMasterService(
+      repo({
+        findVendorById: async () => ({
+          id: "20000000-0000-4000-8000-000000000001",
+          code: "V1",
+          name: "Vendor 1",
+          aliases: [],
+          contactEmail: null,
+          materialKinds: ["LS", "CL"],
+          active: true,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      }),
+    );
+    await expect(
+      service.updateVendor(actor, "20000000-0000-4000-8000-000000000001", {
+        active: false,
+      }),
+    ).rejects.toMatchObject({ code: "REASON_REQUIRED" });
   });
 
-  it('blocks duplicate equipment business key per vendor/type/unit', async () => {
-    const vendorId = '30000000-0000-4000-8000-000000000001';
-    const service = createMasterService(repo({
-      findVendorById: async () => ({ id: vendorId, code: 'V1', name: 'Vendor 1', aliases: [], contactEmail: null, materialKinds:['LS','CL'], active: true, createdAt: now, updatedAt: now }),
-      findEquipmentByBusinessKey: async () => ({ id: '40000000-0000-4000-8000-000000000001', vendorId, vendorCode: 'V1', vendorName: 'Vendor 1', type: 'AA', unitNo: '12', brand: null, model: null, aliases: [], materialKinds:['LS','CL'], active: true, createdAt: now, updatedAt: now }),
-    }));
-    await expect(service.createEquipment(actor, { vendorId, type: 'AA', unitNo: '12', aliases: [], materialKinds:['LS','CL'] })).rejects.toMatchObject({ code: 'EQUIPMENT_EXISTS' });
+  it("blocks duplicate equipment business key per vendor/type/unit", async () => {
+    const vendorId = "30000000-0000-4000-8000-000000000001";
+    const service = createMasterService(
+      repo({
+        findVendorById: async () => ({
+          id: vendorId,
+          code: "V1",
+          name: "Vendor 1",
+          aliases: [],
+          contactEmail: null,
+          materialKinds: ["LS", "CL"],
+          active: true,
+          createdAt: now,
+          updatedAt: now,
+        }),
+        findEquipmentByBusinessKey: async () => ({
+          id: "40000000-0000-4000-8000-000000000001",
+          vendorId,
+          vendorCode: "V1",
+          vendorName: "Vendor 1",
+          type: "AA",
+          unitNo: "12",
+          brand: null,
+          model: null,
+          aliases: [],
+          materialKinds: ["LS", "CL"],
+          active: true,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      }),
+    );
+    await expect(
+      service.createEquipment(actor, {
+        vendorId,
+        type: "AA",
+        unitNo: "12",
+        aliases: [],
+        materialKinds: ["LS", "CL"],
+      }),
+    ).rejects.toMatchObject({ code: "EQUIPMENT_EXISTS" });
   });
 
-  it('limits vendor lookup to the logged-in vendor', async () => {
-    const vendorA = { id: '50000000-0000-4000-8000-000000000001', code: 'A', name: 'Vendor A', aliases: [], contactEmail: null, materialKinds:['LS','CL'] as ('LS'|'CL')[], active: true, createdAt: now, updatedAt: now };
-    const vendorB = { id: '50000000-0000-4000-8000-000000000002', code: 'B', name: 'Vendor B', aliases: [], contactEmail: null, materialKinds:['LS','CL'] as ('LS'|'CL')[], active: true, createdAt: now, updatedAt: now };
-    const vendorPrincipal: AuthPrincipal = { ...actor, role: 'VENDOR', vendorId: vendorA.id };
-    const service = createMasterService(repo({ listVendors: async () => ({ items: [vendorA, vendorB], total: 2 }) }));
+  it("treats DT prefixes, aliases and leading zeros as the same AA", async () => {
+    const vendorId = "30000000-0000-4000-8000-000000000001";
+    const existing = {
+      id: "40000000-0000-4000-8000-000000000001",
+      vendorId,
+      vendorCode: "V1",
+      vendorName: "Vendor 1",
+      type: "AA" as const,
+      unitNo: "7",
+      brand: null,
+      model: null,
+      aliases: ["DT 007"],
+      materialKinds: ["LS" as const],
+      active: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const service = createMasterService(
+      repo({
+        findVendorById: async () => ({
+          id: vendorId,
+          code: "V1",
+          name: "Vendor 1",
+          aliases: [],
+          contactEmail: null,
+          materialKinds: ["LS"],
+          active: true,
+          createdAt: now,
+          updatedAt: now,
+        }),
+        findEquipmentByBusinessKey: async () => null,
+        listEquipment: async () => ({ items: [existing], total: 1 }),
+      }),
+    );
+    await expect(
+      service.createEquipment(actor, {
+        vendorId,
+        type: "AA",
+        unitNo: "AA-0007",
+        aliases: [],
+        materialKinds: ["LS"],
+      }),
+    ).rejects.toMatchObject({
+      code: "EQUIPMENT_EXISTS",
+      details: { equipmentId: existing.id },
+    });
+  });
+
+  it("paginates the equipment lookup instead of silently dropping fleet after 250 rows", async () => {
+    const vendorId = "30000000-0000-4000-8000-000000000001";
+    const item = (n: number) => ({
+      id: `40000000-0000-4000-8000-${String(n).padStart(12, "0")}`,
+      vendorId,
+      vendorCode: "V1",
+      vendorName: "Vendor 1",
+      type: "AA" as const,
+      unitNo: String(n),
+      brand: null,
+      model: null,
+      aliases: [],
+      materialKinds: ["LS" as const],
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const pages = vi.fn(async ({ offset = 0 }: { offset?: number }) =>
+      offset === 0
+        ? {
+            items: Array.from({ length: 250 }, (_, i) => item(i + 1)),
+            total: 251,
+          }
+        : { items: [item(251)], total: 251 },
+    );
+    const service = createMasterService(repo({ listEquipment: pages as any }));
+    const items = await service.getEquipmentLookup(actor, vendorId, "AA", "LS");
+    expect(items).toHaveLength(251);
+    expect(pages).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ limit: 250, offset: 250 }),
+    );
+  });
+
+  it("limits vendor lookup to the logged-in vendor", async () => {
+    const vendorA = {
+      id: "50000000-0000-4000-8000-000000000001",
+      code: "A",
+      name: "Vendor A",
+      aliases: [],
+      contactEmail: null,
+      materialKinds: ["LS", "CL"] as ("LS" | "CL")[],
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const vendorB = {
+      id: "50000000-0000-4000-8000-000000000002",
+      code: "B",
+      name: "Vendor B",
+      aliases: [],
+      contactEmail: null,
+      materialKinds: ["LS", "CL"] as ("LS" | "CL")[],
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const vendorPrincipal: AuthPrincipal = {
+      ...actor,
+      role: "VENDOR",
+      vendorId: vendorA.id,
+    };
+    const service = createMasterService(
+      repo({
+        listVendors: async () => ({ items: [vendorA, vendorB], total: 2 }),
+      }),
+    );
     const lookup = await service.getLookupBootstrap(vendorPrincipal);
     expect(lookup.vendors.map((x) => x.id)).toEqual([vendorA.id]);
   });
-  it('blocks a vendor alias already owned by another canonical vendor', async () => {
-    const service = createMasterService(repo({
-      findVendorByAlias: async () => ({ id: '60000000-0000-4000-8000-000000000001', code: 'OLD', name: 'Existing Vendor', aliases: ['PT TEST'], contactEmail: null, materialKinds:['LS','CL'], active: true, createdAt: now, updatedAt: now }),
-    }));
-    await expect(service.createVendor(actor, { code: 'NEW', name: 'New Vendor', aliases: [' pt   test '], contactEmail: null, materialKinds:['LS','CL'] })).rejects.toMatchObject({ code: 'VENDOR_ALIAS_EXISTS' });
+  it("blocks a vendor alias already owned by another canonical vendor", async () => {
+    const service = createMasterService(
+      repo({
+        findVendorByAlias: async () => ({
+          id: "60000000-0000-4000-8000-000000000001",
+          code: "OLD",
+          name: "Existing Vendor",
+          aliases: ["PT TEST"],
+          contactEmail: null,
+          materialKinds: ["LS", "CL"],
+          active: true,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      }),
+    );
+    await expect(
+      service.createVendor(actor, {
+        code: "NEW",
+        name: "New Vendor",
+        aliases: [" pt   test "],
+        contactEmail: null,
+        materialKinds: ["LS", "CL"],
+      }),
+    ).rejects.toMatchObject({ code: "VENDOR_ALIAS_EXISTS" });
   });
-
 });
 
-describe('Import master HTTP permissions', () => {
-  it.each(['QC_ANALYST', 'SUPERVISOR_ADMIN', 'VENDOR', 'CRUSHER_OPERATOR'] as const)('scopes inline master creation for %s', async role => {
+describe("Import master HTTP permissions", () => {
+  it.each([
+    "QC_ANALYST",
+    "SUPERVISOR_ADMIN",
+    "VENDOR",
+    "CRUSHER_OPERATOR",
+  ] as const)("scopes inline master creation for %s", async (role) => {
     const app = Fastify();
     const principal = { ...actor, role };
-    app.decorate('auth', { requireRoles: (...roles: string[]) => async (request: FastifyRequest) => {
-      if (!roles.includes(role)) throw forbidden();
-      request.principal = principal;
-    }, requireAuth: async () => {} } as unknown as FastifyInstance['auth']);
+    app.decorate("auth", {
+      requireRoles:
+        (...roles: string[]) =>
+        async (request: FastifyRequest) => {
+          if (!roles.includes(role)) throw forbidden();
+          request.principal = principal;
+        },
+      requireAuth: async () => {},
+    } as unknown as FastifyInstance["auth"]);
     const service = createMasterService(repo());
-    const createVendor = vi.spyOn(service, 'createVendor').mockResolvedValue({ id: 'v' } as Awaited<ReturnType<typeof service.createVendor>>);
-    const createEquipment = vi.spyOn(service, 'createEquipment').mockResolvedValue({ id: 'e' } as Awaited<ReturnType<typeof service.createEquipment>>);
+    const createVendor = vi
+      .spyOn(service, "createVendor")
+      .mockResolvedValue({ id: "v" } as Awaited<
+        ReturnType<typeof service.createVendor>
+      >);
+    const createEquipment = vi
+      .spyOn(service, "createEquipment")
+      .mockResolvedValue({ id: "e" } as Awaited<
+        ReturnType<typeof service.createEquipment>
+      >);
     await registerMasterRoutes(app, service);
     try {
-      const permitted = role === 'QC_ANALYST' || role === 'SUPERVISOR_ADMIN';
-      expect((await app.inject({ method: 'POST', url: '/vendors', payload: { code: 'NEW', name: 'New Vendor', materialKinds: ['LS'] } })).statusCode).toBe(permitted ? 200 : 403);
-      expect((await app.inject({ method: 'POST', url: '/equipment', payload: { vendorId: actor.userId, type: 'AA', unitNo: '11', materialKinds: ['LS'] } })).statusCode).toBe(permitted ? 200 : 403);
+      const permitted = role === "QC_ANALYST" || role === "SUPERVISOR_ADMIN";
+      expect(
+        (
+          await app.inject({
+            method: "POST",
+            url: "/vendors",
+            payload: { code: "NEW", name: "New Vendor", materialKinds: ["LS"] },
+          })
+        ).statusCode,
+      ).toBe(permitted ? 200 : 403);
+      expect(
+        (
+          await app.inject({
+            method: "POST",
+            url: "/equipment",
+            payload: {
+              vendorId: actor.userId,
+              type: "AA",
+              unitNo: "11",
+              materialKinds: ["LS"],
+            },
+          })
+        ).statusCode,
+      ).toBe(permitted ? 200 : 403);
       expect(createVendor).toHaveBeenCalledTimes(permitted ? 1 : 0);
       expect(createEquipment).toHaveBeenCalledTimes(permitted ? 1 : 0);
       if (permitted) expect(createVendor.mock.calls[0]?.[0].role).toBe(role);
-      if (role !== 'SUPERVISOR_ADMIN') {
-        expect((await app.inject({ method: 'PATCH', url: '/vendors/' + actor.userId, payload: { name: 'Changed' } })).statusCode).toBe(403);
-        expect((await app.inject({ method: 'POST', url: '/crushers', payload: {} })).statusCode).toBe(403);
+      if (role !== "SUPERVISOR_ADMIN") {
+        expect(
+          (
+            await app.inject({
+              method: "PATCH",
+              url: "/vendors/" + actor.userId,
+              payload: { name: "Changed" },
+            })
+          ).statusCode,
+        ).toBe(403);
+        expect(
+          (await app.inject({ method: "POST", url: "/crushers", payload: {} }))
+            .statusCode,
+        ).toBe(403);
       }
-    } finally { await app.close(); }
+    } finally {
+      await app.close();
+    }
   });
 });

@@ -1,0 +1,387 @@
+.retase-counter-page .counter-context-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.retase-counter-page .counter-context-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e4e7ec;
+}
+
+.retase-counter-page .counter-context-heading strong {
+  margin-top: 3px;
+  font-size: 16px;
+}
+
+.retase-counter-page .counter-context-heading small {
+  margin-top: 3px;
+}
+
+.retase-counter-page .counter-section-label,
+.retase-counter-page .counter-column-label {
+  display: block;
+  color: #667085;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.retase-counter-page .counter-section-label {
+  color: #0e7490;
+}
+
+.retase-counter-page .counter-context-grid {
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 12px;
+  padding: 14px 18px 16px;
+}
+
+.retase-counter-page .counter-toolbar {
+  padding: 14px 18px;
+  border-left: 4px solid #0e7490;
+}
+
+.retase-counter-page .counter-toolbar strong {
+  margin-top: 0;
+}
+
+.retase-counter-page .counter-paper-board {
+  padding: 0;
+  overflow: hidden;
+}
+
+.retase-counter-page .counter-board-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border-bottom: 1px solid #d9e2ec;
+}
+
+.retase-counter-page .counter-board-heading strong {
+  margin-top: 4px;
+  font-size: 19px;
+}
+
+.retase-counter-page .counter-board-heading small {
+  margin-top: 4px;
+}
+
+.retase-counter-page .counter-board-total {
+  min-width: 74px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: #ecfeff;
+  color: #0e7490;
+  font-size: 15px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.retase-counter-page .counter-vendor-list {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.retase-counter-page .counter-vendor-group {
+  overflow: hidden;
+  border: 1px solid #d9e2ec;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.retase-counter-page .counter-vendor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #eff8ff;
+  border-bottom: 1px solid #d9e2ec;
+}
+
+.retase-counter-page .counter-vendor-header strong {
+  margin-top: 3px;
+  color: #12314b;
+  font-size: 16px;
+}
+
+.retase-counter-page .counter-vendor-count {
+  padding: 5px 9px;
+  border: 1px solid #b2ddff;
+  border-radius: 999px;
+  color: #175cd3;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.retase-counter-page .counter-paper-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.1fr) minmax(180px, 1fr) minmax(240px, 1.2fr);
+  gap: 16px;
+  align-items: center;
+  padding: 13px 16px;
+  border-top: 1px solid #eef2f6;
+}
+
+.retase-counter-page .counter-paper-head {
+  padding-top: 9px;
+  padding-bottom: 9px;
+  border-top: 0;
+  background: #f8fafc;
+}
+
+.retase-counter-page .counter-paper-head span {
+  color: #667085;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.retase-counter-page .counter-dt-cell strong {
+  margin-top: 4px;
+  color: #12314b;
+  font-size: 25px;
+  font-variant-numeric: tabular-nums;
+}
+
+.retase-counter-page .counter-time-cell strong {
+  margin-top: 4px;
+  color: #344054;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.retase-counter-page .counter-time-cell small {
+  margin-top: 3px;
+  font-size: 10px;
+}
+
+.retase-counter-page .counter-paper-row.outside-window {
+  background: #fcfcfd;
+}
+
+.retase-counter-page .counter-paper-row.outside-window .counter-dt-cell,
+.retase-counter-page .counter-paper-row.outside-window .counter-time-cell {
+  opacity: 0.62;
+}
+
+.retase-counter-page .counter-tally {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 74px;
+  padding: 9px 13px;
+  border: 2px solid #7dd3fc;
+  border-radius: 10px;
+  background: #f0fdff;
+  color: #0e7490;
+  text-align: left;
+  transition: 0.15s ease;
+}
+
+.retase-counter-page .counter-tally:hover:not(:disabled) {
+  border-color: #0e7490;
+  background: #ecfeff;
+  box-shadow: 0 5px 14px rgba(14, 116, 144, 0.12);
+  transform: translateY(-1px);
+}
+
+.retase-counter-page .counter-tally .counter-column-label {
+  color: #0e7490;
+}
+
+.retase-counter-page .counter-tally strong {
+  margin: 0;
+  color: #0e7490;
+  font-size: 34px;
+  line-height: 1;
+  text-align: center;
+}
+
+.retase-counter-page .counter-tally small {
+  color: #0e7490;
+  font-size: 9px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.retase-counter-page .counter-tally:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.retase-counter-page .counter-tally.pending {
+  border-color: #fbbf24;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.retase-counter-page .counter-tally.failed {
+  border-color: #fda4af;
+  background: #fff1f2;
+  color: #b42318;
+}
+
+.retase-counter-page .counter-tally.pending strong,
+.retase-counter-page .counter-tally.pending small,
+.retase-counter-page .counter-tally.failed strong,
+.retase-counter-page .counter-tally.failed small {
+  color: inherit;
+}
+
+.retase-counter-page .counter-empty {
+  padding: 28px;
+  text-align: center;
+}
+
+.retase-counter-page .counter-empty strong,
+.retase-counter-page .counter-empty span {
+  display: block;
+}
+
+.retase-counter-page .counter-empty span {
+  margin-top: 5px;
+  color: #667085;
+  font-size: 11px;
+}
+
+@media (max-width: 850px) {
+  .retase-counter-page .counter-context-grid {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+
+  .retase-counter-page .counter-paper-row {
+    grid-template-columns: minmax(145px, 1fr) minmax(145px, 1fr) minmax(210px, 1.25fr);
+    gap: 10px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+}
+
+@media (max-width: 620px) {
+  .retase-counter-page .counter-context-heading,
+  .retase-counter-page .counter-board-heading,
+  .retase-counter-page .counter-vendor-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .retase-counter-page .counter-context-heading .status-badge {
+    margin-top: 0;
+  }
+
+  .retase-counter-page .counter-context-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .retase-counter-page .counter-paper-head {
+    display: none;
+  }
+
+  .retase-counter-page .counter-paper-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 14px;
+    padding: 13px 12px;
+  }
+
+  .retase-counter-page .counter-tally {
+    grid-column: 1 / -1;
+  }
+
+  .retase-counter-page .counter-vendor-list {
+    padding: 8px;
+  }
+}
+.retase-counter-page .counter-vendor-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 12px;
+  background: #f8fafc;
+  border-bottom: 1px solid #d9e2ec;
+}
+
+.retase-counter-page .counter-vendor-tab {
+  display: grid;
+  min-width: 190px;
+  gap: 3px;
+  padding: 10px 13px;
+  border: 1px solid #d9e2ec;
+  border-radius: 9px;
+  background: #fff;
+  color: #344054;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.retase-counter-page .counter-vendor-tab:hover,
+.retase-counter-page .counter-vendor-tab.active {
+  border-color: #0e7490;
+  background: #ecfeff;
+  color: #0e7490;
+}
+
+.retase-counter-page .counter-vendor-tab span {
+  color: #667085;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.retase-counter-page .counter-vendor-tab strong {
+  margin: 0;
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+}
+
+.retase-counter-page .counter-vendor-tab small {
+  margin: 0;
+  color: #667085;
+  font-size: 10px;
+}
+
+.retase-counter-page .counter-vendor-tab.active span,
+.retase-counter-page .counter-vendor-tab.active small {
+  color: #0e7490;
+}
+
+.retase-counter-page .counter-tally-marks {
+  grid-column: 1 / -1;
+  display: block;
+  min-height: 19px;
+  padding-top: 7px;
+  border-top: 1px dashed #bae6fd;
+  color: #0e7490;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  overflow-wrap: anywhere;
+  white-space: pre;
+}
+
+.retase-counter-page .counter-tally.pending .counter-tally-marks,
+.retase-counter-page .counter-tally.failed .counter-tally-marks {
+  border-top-color: currentColor;
+  color: inherit;
+}
+
+@media (max-width: 620px) {
+  .retase-counter-page .counter-vendor-tab {
+    min-width: 160px;
+  }
+}

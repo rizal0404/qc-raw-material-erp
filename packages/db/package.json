@@ -8,6 +8,7 @@
     "./schema": "./src/schema/index.ts"
   },
   "scripts": {
+    "test:photo-db": "node --env-file-if-exists=../../.env --import=tsx --test src/crusher-report.integration.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file-if-exists=../../.env --import=tsx src/migrate.ts",
     "db:verify": "node --env-file-if-exists=../../.env --import=tsx src/verify-migrations.ts",

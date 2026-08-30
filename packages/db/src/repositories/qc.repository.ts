@@ -164,9 +164,24 @@ export function createQcRepository(db: PostgresJsDatabase<typeof Schema>): QcRep
       ]);
       return {items:items.map(rawSampleRecord),total:Number(totalRows[0]?.value??0)};
     },
+    async nextRawSampleNumber(){
+      const rows=await db.execute(sql`SELECT COALESCE(MAX(CASE WHEN btrim(no_sample) ~ '^[0-9]+$' THEN btrim(no_sample)::numeric ELSE 0 END),0)+1 AS value FROM raw_samples`);
+      return Number((rows as unknown as Array<Record<string,unknown>>)[0]?.value??1);
+    },
     async findRawSampleById(id){ const [r]=await db.select().from(rawSamples).where(eq(rawSamples.id,id)).limit(1); return r?rawSampleRecord(r):null; },
     async findRawSampleBySampleId(sampleId){ const [r]=await db.select().from(rawSamples).where(sql`lower(${rawSamples.sampleId})=lower(${sampleId})`).limit(1); return r?rawSampleRecord(r):null; },
-    async createRawSample(input){ const [r]=await db.insert(rawSamples).values(sampleValues(input)).returning(); if(!r)throw new Error('Gagal membuat sample.');return rawSampleRecord(r); },
+    async createRawSample(input){
+      const insert=async(tx:any,values:RawSampleWriteInput)=>{const [r]=await tx.insert(rawSamples).values(sampleValues(values)).returning();return r;};
+      const r=input.noSample!==null
+        ? await insert(db,input)
+        : await db.transaction(async(tx)=>{
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('raw_samples:no_sample'))`);
+          const rows=await tx.execute(sql`SELECT COALESCE(MAX(CASE WHEN btrim(no_sample) ~ '^[0-9]+$' THEN btrim(no_sample)::numeric ELSE 0 END),0)+1 AS value FROM raw_samples`);
+          const noSample=String((rows as unknown as Array<Record<string,unknown>>)[0]?.value??1);
+          return insert(tx,{...input,noSample});
+        });
+      if(!r)throw new Error('Gagal membuat sample.');return rawSampleRecord(r);
+    },
     async updateRawSample(id,patch){
       const values: Record<string,unknown>={updatedAt:new Date()};
       const direct=['sampleId','materialKind','operationDate','noSample','sourceShift','typeGrade','vendorId','vendorSnapshot','sourceId','sourceSnapshot','plantId','loaderUnitNo','block','direction','note'] as const;

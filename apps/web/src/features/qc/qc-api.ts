@@ -14,6 +14,7 @@ export interface MixListItem extends Omit<MixView,'items'> {}
 export function masterLookups(){return apiFetch<MasterLookupResponse>('/lookups/master');}
 export function masterLookupsFor(materialKind:MaterialKind){return apiFetch<MasterLookupResponse>(`/lookups/master?materialKind=${materialKind}`);}
 export function listSamples(params:Record<string,string|number|undefined>){const q=new URLSearchParams();Object.entries(params).forEach(([k,v])=>{if(v!==undefined&&v!=='')q.set(k,String(v));});return apiFetch<{ok:true;items:RawSampleView[];total:number}>(`/samples?${q}`);}
+export function nextSampleNumber(){return apiFetch<{ok:true;nextNumber:number}>('/samples/next-number');}
 export function getWorkbenchSamples(materialKind:MaterialKind,operationDate:string){return apiFetch<{ok:true;items:WorkbenchSample[]}>(`/workbench/samples?materialKind=${materialKind}&operationDate=${operationDate}`);}
 export function getClayWorkbenchSources(operationDate:string,shiftCode:string){return apiFetch<{ok:true;items:ClayWorkbenchSource[]}>(`/workbench/clay-retase?operationDate=${operationDate}&shiftCode=${shiftCode}`);}
 export function listMixes(params:Record<string,string|number|undefined>){const q=new URLSearchParams();Object.entries(params).forEach(([k,v])=>{if(v!==undefined&&v!=='')q.set(k,String(v));});return apiFetch<{ok:true;items:MixListItem[];total:number}>(`/mixes?${q}`);}

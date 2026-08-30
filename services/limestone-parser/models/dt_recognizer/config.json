@@ -1,0 +1,7 @@
+{
+  "input_height": 32,
+  "input_width": 160,
+  "character_set": "0123456789",
+  "model_type": "crnn",
+  "num_classes": 11
+}

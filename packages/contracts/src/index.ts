@@ -13,3 +13,6 @@ export * from './vendor-operation';
 export * from './retase';
 export * from './reconciliation';
 export * from './stockpile-map';
+export * from './crusher-report';
+export * from './orevision';
+export * from './orevision-mapping';

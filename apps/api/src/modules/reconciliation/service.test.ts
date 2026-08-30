@@ -117,6 +117,7 @@ function repository(overrides: Partial<ReconciliationRepository> = {}): Reconcil
     listAssignmentEvents: vi.fn(async () => []),
     getAllocation: vi.fn(async () => allocation()),
     createAllocation: vi.fn(async () => allocation()),
+    autoReserveSingleCandidate: vi.fn(async () => ({ allocation: { ...allocation(), mappingStatus: 'RESERVED' as const }, changed: true })),
     updateAllocation: vi.fn(async () => allocation()),
     confirmAllocation: vi.fn(async (): Promise<RetaseAllocationRecord> => ({ ...allocation(), mappingStatus: 'CONFIRMED', confirmedBy: userId, confirmedAt: new Date() })),
     markReviewRequiredForDrift: vi.fn(async () => 0),
@@ -137,11 +138,20 @@ describe('Slice 06 reconciliation service', () => {
     await expect(service.createAllocation(principal,{assignmentId,sampleId:sampleA,approvedRetase:1})).rejects.toMatchObject({code:'CLAY_DIRECT_WORKFLOW'});
     await expect(service.confirm(principal,allocationId,{approvedRetase:1})).rejects.toMatchObject({code:'CLAY_DIRECT_WORKFLOW'});
   });
-  it('derives SUGGESTED when exactly one Vendor candidate exists', async () => {
-    const service = createReconciliationService(repository());
+  it('auto-reserves and derives RESERVED when exactly one Vendor candidate exists', async () => {
+    const repo = repository();
+    const service = createReconciliationService(repo);
     const result = await service.list(principal, { operationDate: '2026-08-20' });
-    expect(result.items[0]?.mappingStatus).toBe('SUGGESTED');
+    expect(result.items[0]?.mappingStatus).toBe('RESERVED');
     expect(result.items[0]?.suggestedSampleCode).toBe('LS001');
+    expect(repo.autoReserveSingleCandidate).toHaveBeenCalledWith({
+      assignmentId,
+      sampleId: sampleA,
+      observedRetase: 10,
+      createdBy: userId,
+    });
+    expect(result.items[0]?.reservedRetase).toBe(10);
+    expect(result.items[0]?.remainingRetase).toBe(0);
   });
 
   it('derives AMBIGUOUS when Vendor maps to multiple Sample_ID candidates', async () => {

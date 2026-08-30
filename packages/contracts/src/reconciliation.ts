@@ -5,7 +5,7 @@ import { ChemistrySchema, QualitySchema } from './qc';
 import { ShiftCodeSchema } from './vendor-operation';
 import { AssignmentOriginSchema } from './retase';
 
-export const MappingStatusSchema = z.enum(['UNMAPPED','SUGGESTED','AMBIGUOUS','CONFIRMED','CONSUMED','REVIEW_REQUIRED']);
+export const MappingStatusSchema = z.enum(['UNMAPPED','SUGGESTED','RESERVED','AMBIGUOUS','CONFIRMED','CONSUMED','REVIEW_REQUIRED']);
 
 export const ReconciliationListQuerySchema = z.object({
   operationDate: IsoDateSchema,
@@ -30,7 +30,7 @@ export const ReconciliationCandidateSchema = z.object({
   typeGrade: z.string().nullable(),
   chemistry: ChemistrySchema,
   quality: QualitySchema,
-  matchMode: z.enum(['VENDOR_ID','VENDOR_TEXT']),
+  matchMode: z.enum(['AM_ID','VENDOR_ID','VENDOR_TEXT']),
 });
 
 export const ReconciliationAllocationSchema = z.object({
@@ -81,6 +81,7 @@ export const ReconciliationAssignmentSchema = z.object({
   materialKind: MaterialKindSchema,
   materialCategory: z.string(),
   assignedAaCount: z.number().int().nonnegative(),
+  assignedAaUnitNos: z.array(z.string()).optional(),
   aaWithDumpCount: z.number().int().nonnegative(),
   observedRetase: z.number().int().nonnegative(),
   reservedRetase: z.number().int().nonnegative(),
