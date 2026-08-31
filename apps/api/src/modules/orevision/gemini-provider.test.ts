@@ -12,6 +12,10 @@ const settings: EngineSettings = {
   provider: "gemini",
   model: "models/gemini-2.5-flash",
   customEndpoint: "http://localhost:11434/v1/chat/completions",
+  systemPrompt: "",
+  temperature: null,
+  topP: null,
+  maxOutputTokens: null,
   keys: { gemini: "private-gemini-test-key" },
 };
 const json = (value: unknown, status = 200) =>

@@ -4,7 +4,7 @@ import cookie from '@fastify/cookie';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { ZodError } from 'zod';
-import { createClayReportRepository, createDatabase, createIamRepository, createMasterRepository, createQcRepository, createVendorOperationRepository, createRetaseRepository, createReconciliationRepository, createStockpileMapRepository } from '@qc/db';
+import { createClayPhotoReportRepository, createClayReportRepository, createDatabase, createIamRepository, createMasterRepository, createQcRepository, createVendorOperationRepository, createRetaseRepository, createReconciliationRepository, createStockpileMapRepository } from '@qc/db';
 import type { AppConfig } from './config';
 import { AppError } from './lib/errors';
 import { registerSystemRoutes } from './modules/system/routes';
@@ -30,6 +30,8 @@ import { createClayReportService } from './modules/clay-report/service';
 import { createCrusherReportRepository } from '@qc/db';
 import { createCrusherReportService } from './modules/crusher-report/service';
 import { registerCrusherReportRoutes } from './modules/crusher-report/routes';
+import { createClayPhotoReportService } from './modules/clay-photo-report/service';
+import { registerClayPhotoReportRoutes } from './modules/clay-photo-report/routes';
 
 function isAllowedOrigin(config: AppConfig, origin: string | undefined): boolean {
   if (!origin) return true;
@@ -54,6 +56,7 @@ export async function buildApp(config: AppConfig) {
   const stockpileMapService = createStockpileMapService(stockpileMapRepository, masterRepository, qcRepository);
   const clayReportRepository = createClayReportRepository(database.db);
   const clayReportService = createClayReportService(clayReportRepository, masterRepository);
+  const clayPhotoReportService = createClayPhotoReportService(createClayPhotoReportRepository(database.db), masterRepository);
   const crusherReportService = createCrusherReportService(createCrusherReportRepository(database.db), masterRepository);
   const authService = createAuthService({
     repository: iamRepository,
@@ -171,6 +174,7 @@ export async function buildApp(config: AppConfig) {
     await registerReconciliationRoutes(v1, reconciliationService);
     await registerStockpileMapRoutes(v1, stockpileMapService);
     await registerClayReportRoutes(v1, clayReportService);
+    await registerClayPhotoReportRoutes(v1, clayPhotoReportService);
     await registerCrusherReportRoutes(v1, crusherReportService);
     await registerOreVisionRoutes(v1);
     // Next slices: operations-reporting/audit explorer.

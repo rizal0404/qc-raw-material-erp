@@ -75,6 +75,10 @@ export function createOreVisionSettings(env: NodeJS.ProcessEnv = process.env) {
       provider: settings.provider,
       model: settings.model,
       customEndpoint: settings.customEndpoint,
+      systemPrompt: settings.systemPrompt,
+      temperature: settings.temperature,
+      topP: settings.topP,
+      maxOutputTokens: settings.maxOutputTokens,
       hasApiKey: !!settings.keys[settings.provider],
       configuredProviders: providers.filter((p) => !!settings.keys[p]),
       customEndpoints,
@@ -110,6 +114,21 @@ export function createOreVisionSettings(env: NodeJS.ProcessEnv = process.env) {
           ? geminiModelId(parsed.model)
           : parsed.model,
       customEndpoint: parsed.customEndpoint,
+      // Older clients omit tuning fields. Preserve the saved value unless an
+      // explicit blank/null requests a reset to the provider default.
+      systemPrompt:
+        input.systemPrompt === undefined
+          ? previous.systemPrompt
+          : parsed.systemPrompt,
+      temperature:
+        input.temperature === undefined
+          ? previous.temperature
+          : parsed.temperature,
+      topP: input.topP === undefined ? previous.topP : parsed.topP,
+      maxOutputTokens:
+        input.maxOutputTokens === undefined
+          ? previous.maxOutputTokens
+          : parsed.maxOutputTokens,
       keys: {
         ...previous.keys,
         ...(parsed.apiKey !== undefined

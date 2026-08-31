@@ -106,6 +106,48 @@ describe("OreVision settings UI", () => {
       screen.queryByRole("button", { name: "Simpan konfigurasi" }),
     ).toBeNull();
     expect(screen.queryByRole("button", { name: "Uji koneksi" })).toBeNull();
+    expect(screen.getByLabelText("System prompt tambahan").matches(":disabled")).toBe(true);
+    expect(screen.getByLabelText("Temperature VLM").matches(":disabled")).toBe(true);
+    expect(screen.queryByRole("button", { name: "Reset parameter & prompt" })).toBeNull();
+  });
+  it("sends the configured prompt and sampling parameters to both test and save", async () => {
+    await setup(true);
+    fireEvent.change(screen.getByLabelText("API key OreVision"), { target: { value: "test-key" } });
+    fireEvent.change(screen.getByLabelText("System prompt tambahan"), { target: { value: "Jangan menebak angka yang tidak terbaca." } });
+    fireEvent.change(screen.getByLabelText("Temperature VLM"), { target: { value: "0" } });
+    fireEvent.change(screen.getByLabelText("Top-p VLM"), { target: { value: "0.85" } });
+    fireEvent.change(screen.getByLabelText("Batas output token VLM"), { target: { value: "4096" } });
+    fireEvent.click(screen.getByRole("button", { name: "Uji koneksi" }));
+    await screen.findByText("Koneksi berhasil");
+    const expected = { systemPrompt: "Jangan menebak angka yang tidak terbaca.", temperature: 0, topP: 0.85, maxOutputTokens: 4096 };
+    const testBody = vi.mocked(apiFetch).mock.calls.find(([path]) => path === "/orevision/test")![1]!.body;
+    expect(JSON.parse(String(testBody))).toMatchObject(expected);
+    fireEvent.click(screen.getByRole("button", { name: "Simpan konfigurasi" }));
+    await waitFor(() => expect(vi.mocked(apiFetch).mock.calls.some(([, init]) => init?.method === "PUT")).toBe(true));
+    const savedBody = vi.mocked(apiFetch).mock.calls.find(([, init]) => init?.method === "PUT")![1]!.body;
+    expect(JSON.parse(String(savedBody))).toMatchObject(expected);
+    await screen.findByText(/hasil dan koreksi lama tidak berubah otomatis/);
+  });
+  it("validates numeric bounds and allows explicit reset to engine defaults", async () => {
+    await setup(true);
+    fireEvent.change(screen.getByLabelText("Temperature VLM"), { target: { value: "2.5" } });
+    expect(screen.getByRole("alert").textContent).toContain("Temperature harus antara 0 dan 2");
+    expect((screen.getByRole("button", { name: "Simpan konfigurasi" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("Temperature VLM"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("Top-p VLM"), { target: { value: "0" } });
+    expect(screen.getByRole("alert").textContent).toContain("Top-p harus lebih dari 0");
+    fireEvent.change(screen.getByLabelText("Top-p VLM"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("Batas output token VLM"), { target: { value: "512.5" } });
+    expect(screen.getByRole("alert").textContent).toContain("bilangan bulat");
+    fireEvent.change(screen.getByLabelText("System prompt tambahan"), { target: { value: "prompt sementara" } });
+    fireEvent.click(screen.getByRole("button", { name: "Reset parameter & prompt" }));
+    expect((screen.getByLabelText("System prompt tambahan") as HTMLTextAreaElement).value).toBe("");
+    expect((screen.getByLabelText("Batas output token VLM") as HTMLInputElement).value).toBe("");
+    expect(screen.queryByRole("alert")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Simpan konfigurasi" }));
+    await waitFor(() => expect(vi.mocked(apiFetch).mock.calls.some(([, init]) => init?.method === "PUT")).toBe(true));
+    const body = vi.mocked(apiFetch).mock.calls.find(([, init]) => init?.method === "PUT")![1]!.body;
+    expect(JSON.parse(String(body))).toMatchObject({ systemPrompt: "", temperature: null, topP: null, maxOutputTokens: null });
   });
   it("requires a provider key before testing and loads Gemini IDs using the unsaved key", async () => {
     vi.mocked(apiFetch).mockImplementation(async (path) =>

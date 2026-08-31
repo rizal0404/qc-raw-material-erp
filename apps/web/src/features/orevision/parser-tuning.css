@@ -1,0 +1,245 @@
+.orevision-tuning-fields {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  margin: 4px 0;
+  padding: 14px;
+  border: 1px solid var(--border, #dfe6e4);
+  border-radius: 10px;
+  background: #f8fbfa;
+}
+.orevision-tuning-fields legend {
+  padding: 0 5px;
+  font-size: 13px;
+  font-weight: 800;
+}
+.orevision-tuning-fields label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 650;
+}
+.orevision-tuning-fields input,
+.orevision-tuning-fields textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--border, #dfe6e4);
+  border-radius: 7px;
+  background: #fff;
+  padding: 9px;
+  color: var(--ink, #203a37);
+  font: inherit;
+}
+.orevision-tuning-fields textarea {
+  resize: vertical;
+  min-height: 110px;
+  line-height: 1.5;
+}
+.orevision-tuning-fields input:focus-visible,
+.orevision-tuning-fields textarea:focus-visible {
+  outline: 2px solid var(--accent, #157568);
+  outline-offset: 1px;
+}
+.orevision-tuning-fields small {
+  color: var(--muted, #657975);
+  line-height: 1.5;
+  font-size: 11px;
+  font-weight: 400;
+}
+.orevision-tuning-fields > button {
+  justify-self: start;
+}
+.orevision-tuning-fields:disabled {
+  opacity: .8;
+}
+.orevision-tuning-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.orevision-settings .orevision-provider-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.orevision-settings > label {
+  display: grid;
+  gap: 6px;
+}
+.orevision-settings > label > input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.parser-diagnostics {
+  min-width: 0;
+  border: 1px solid var(--border, #dce5e2);
+  border-radius: 11px;
+  background: #fff;
+  color: var(--ink, #203a37);
+}
+.parser-diagnostics > summary {
+  padding: 15px 17px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+.parser-diagnostics > summary > small {
+  margin-left: 12px;
+  color: var(--muted, #657975);
+  font-size: 11px;
+  font-weight: 400;
+}
+.parser-diagnostics-body {
+  display: grid;
+  gap: 13px;
+  min-width: 0;
+  padding: 0 17px 17px;
+}
+.parser-diagnostics-heading,
+.parser-diagnostics-meta,
+.parser-diagnostics-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.parser-diagnostics h3,
+.parser-diagnostics h4,
+.parser-diagnostics p {
+  margin: 0;
+}
+.parser-diagnostics h3 {
+  font-size: 15px;
+}
+.parser-diagnostics h4 {
+  font-size: 13px;
+}
+.parser-diagnostics p,
+.parser-diagnostics-meta {
+  color: var(--muted, #657975);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.parser-diagnostics-heading p {
+  max-width: 750px;
+  margin-top: 5px;
+}
+.parser-diagnostics-sources,
+.parser-diagnostics-tabs {
+  display: flex;
+  gap: 5px;
+  padding: 5px;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: #edf4f1;
+}
+.parser-diagnostics-sources button,
+.parser-diagnostics-tabs button {
+  border: 0;
+  border-radius: 5px;
+  padding: 8px 10px;
+  background: transparent;
+  color: #536d66;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.parser-diagnostics-sources button.active,
+.parser-diagnostics-tabs button.active {
+  background: #fff;
+  color: #0f6d5e;
+  box-shadow: 0 1px 3px #203a3715;
+}
+.parser-diagnostics button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.parser-diagnostics-output {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+.parser-diagnostics-actions {
+  justify-content: flex-end;
+}
+.parser-diagnostics-output pre {
+  max-height: 420px;
+  min-height: 85px;
+  overflow: auto;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid #dce5e2;
+  border-radius: 8px;
+  background: #f7faf9;
+  color: #203a37;
+  font: 11px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 2;
+}
+.parser-diagnostics .parser-diagnostics-error,
+.parser-diagnostics .parser-diagnostics-warning,
+.parser-diagnostics .parser-diagnostics-experiment,
+.parser-diagnostics .parser-diagnostics-empty {
+  padding: 10px 12px;
+  border-radius: 7px;
+}
+.parser-diagnostics .parser-diagnostics-error {
+  color: #a13124;
+  background: #fff1ef;
+}
+.parser-diagnostics .parser-diagnostics-warning {
+  color: #865600;
+  background: #fff6d9;
+}
+.parser-diagnostics .parser-diagnostics-experiment,
+.parser-diagnostics .parser-diagnostics-empty {
+  background: #edf4f1;
+}
+.parser-diagnostics-preview {
+  display: grid;
+  gap: 10px;
+  padding-top: 15px;
+  border-top: 1px solid #e1e9e5;
+}
+.parser-diagnostics-preview > button {
+  justify-self: start;
+}
+.parser-diagnostics .parser-diagnostics-current-engine {
+  color: #254f43;
+  font-weight: 700;
+}
+.parser-diagnostics-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.parser-diagnostics-consent > input {
+  width: auto;
+  flex: 0 0 auto;
+  margin: 2px 0 0;
+}
+.clay-photo > .parser-diagnostics {
+  margin: 16px 0;
+}
+@media (max-width: 600px) {
+  .orevision-tuning-grid {
+    grid-template-columns: 1fr;
+  }
+  .orevision-settings .orevision-provider-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .parser-diagnostics > summary > small {
+    display: block;
+    margin: 5px 0 0 17px;
+  }
+  .parser-diagnostics-actions {
+    justify-content: flex-start;
+  }
+}

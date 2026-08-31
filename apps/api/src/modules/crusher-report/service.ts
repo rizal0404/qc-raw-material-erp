@@ -11,6 +11,7 @@ import { reportShiftHours } from "@qc/domain";
 import type { CrusherReportDraft, CrusherReportImport } from "@qc/contracts";
 import { AppError, forbidden, notFound } from "../../lib/errors";
 import { extractReport } from "../orevision/extractor";
+import { OreVisionExtractionError } from "../orevision/diagnostics";
 
 export const MAX_REPORT_IMAGE_BYTES = 4 * 1024 * 1024;
 export function createCrusherReportService(
@@ -19,6 +20,7 @@ export function createCrusherReportService(
   options: { extract?: typeof extractReport } = {},
 ) {
   const runExtraction = options.extract ?? extractReport;
+  const previews = new Set<string>();
   async function scope(actor: AuthPrincipal, crusherId: string) {
     if (
       !["CRUSHER_OPERATOR", "QC_ANALYST", "SUPERVISOR_ADMIN"].includes(
@@ -178,6 +180,7 @@ export function createCrusherReportService(
         error instanceof AppError
           ? error.message
           : "OreVision gagal di API. Periksa konfigurasi engine lalu ulangi ekstraksi.",
+        error instanceof OreVisionExtractionError ? error.diagnostics : undefined,
       );
     }
     return (await repository.get(id))!;
@@ -185,6 +188,33 @@ export function createCrusherReportService(
   return {
     get,
     process: processImport,
+    async preview(actor: AuthPrincipal, id: string) {
+      const current = await get(actor, id);
+      if (["QUEUED", "PROCESSING"].includes(current.status))
+        throw new AppError(409, "IMPORT_BUSY", "Tunggu ekstraksi aktif selesai sebelum menguji parser.");
+      if (previews.has(id))
+        throw new AppError(429, "OREVISION_PREVIEW_BUSY", "Uji parser untuk foto ini sedang berjalan.");
+      previews.add(id);
+      try {
+        const source = await repository.file(id, false);
+        if (!source) throw notFound("Gambar belum tersedia.");
+        const shifts = await master.listShifts(true);
+        const shiftHours = Object.fromEntries(
+          shifts.map((shift) => [shift.code, reportShiftHours(shift)]),
+        );
+        // A tuning preview never claims/requeues a job or changes review data.
+        const output = await runExtraction(source.bytes, shiftHours);
+        if (!output.result.diagnostics)
+          throw new AppError(502, "OREVISION_DIAGNOSTICS_UNAVAILABLE", "Parser tidak menyediakan diagnostik untuk uji ini.");
+        return output.result.diagnostics;
+      } catch (error) {
+        if (error instanceof OreVisionExtractionError) return error.diagnostics;
+        if (error instanceof AppError) throw error;
+        throw new AppError(502, "OREVISION_PREVIEW_FAILED", "Uji parser gagal. Periksa konfigurasi engine lalu ulangi.");
+      } finally {
+        previews.delete(id);
+      }
+    },
     async list(actor: AuthPrincipal, crusherId: string) {
       await scope(actor, crusherId);
       return repository.list(crusherId);

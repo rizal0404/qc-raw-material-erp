@@ -2,6 +2,9 @@
 infra/docker/
 scripts/
 .tmp/
+.runtime/
+log/
+output/
 
 # Project documentation (not needed at runtime)
 docs/

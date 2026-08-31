@@ -39,3 +39,25 @@ export function stockpileQualityStatus(materialKind:'LS'|'CL',className:string|n
   const status=qafStatus(materialKind,className,aggregate.totalTon,aggregate.quality,rules);
   return status==='NO DATA'?'NO_DATA':status;
 }
+
+export interface StockpileGeometry extends StockpileRectangle { startDepth:number; endDepth:number; }
+
+/** Lower footprint as percentage of warehouse width; legacy slope is schematic. */
+export function stockpileDepth(layout:Pick<WarehouseLayoutRecord,'maxLevel'>, layer:Pick<StockpileRectangle,'bottomLevel'> & {startDepth?:number|undefined;endDepth?:number|undefined}) {
+  const inset=39*layer.bottomLevel/layout.maxLevel;
+  return {startDepth:layer.startDepth??inset,endDepth:layer.endDepth??100-inset};
+}
+
+export function validateStockpileGeometry(layout:Pick<WarehouseLayoutRecord,'axisLength'|'maxLevel'>, input:StockpileRectangle & {startDepth?:number|undefined;endDepth?:number|undefined}):StockpileGeometry {
+  // Round BEFORE validation/collision: persisted numeric(12,4) must match checks.
+  const raw={...normalizeStockpileRectangle(input),...stockpileDepth(layout,input)};
+  const rounded=Object.fromEntries(Object.entries(raw).map(([key,value])=>[key,Math.round(value*1e4)/1e4])) as unknown as StockpileGeometry;
+  validateStockpileRectangle(layout,rounded);
+  if(!Number.isFinite(rounded.startDepth)||!Number.isFinite(rounded.endDepth)||rounded.startDepth<0||rounded.endDepth>100||rounded.endDepth<=rounded.startDepth)
+    throw new Error('Lebar layer harus positif dan posisi melintang berada pada 0–100%.');
+  return rounded;
+}
+
+export function stockpileGeometriesOverlap(a:StockpileGeometry,b:StockpileGeometry):boolean {
+  return stockpileRectanglesOverlap(a,b)&&Math.max(a.startDepth,b.startDepth)<Math.min(a.endDepth,b.endDepth);
+}

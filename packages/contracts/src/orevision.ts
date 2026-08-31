@@ -117,10 +117,53 @@ export const OreVisionSettingsSchema = z.object({
   customEndpoint: z.string().url().max(2000),
   // Omitted: keep provider key. Empty: clear provider key.
   apiKey: z.string().trim().max(1000).optional(),
+  // Additional instructions; the report-specific extraction contract remains built in.
+  systemPrompt: z.string().max(12000).default(""),
+  // Null keeps the provider's sampling defaults and our existing output budget.
+  temperature: z.number().finite().min(0).max(2).nullable().default(null),
+  topP: z.number().finite().gt(0).max(1).nullable().default(null),
+  maxOutputTokens: z.number().int().min(256).max(65536).nullable().default(null),
 });
-export type OreVisionSettingsInput = z.infer<typeof OreVisionSettingsSchema>;
-export type OreVisionSettingsView = Omit<OreVisionSettingsInput, "apiKey"> & {
+export type OreVisionSettingsInput = z.input<typeof OreVisionSettingsSchema>;
+export type OreVisionSettingsView = Omit<z.output<typeof OreVisionSettingsSchema>, "apiKey"> & {
   hasApiKey: boolean;
   configuredProviders: OreVisionProvider[];
   customEndpoints: string[];
 };
+
+// Immutable extraction evidence, separate from the draft edited during review.
+// Only allowlisted input metadata is captured: no credentials or image payloads.
+export const OreVisionDiagnosticsSchema = z.object({
+  version: z.literal(1),
+  capturedAt: z.string().datetime(),
+  input: z.object({
+    provider: OreVisionProviderSchema,
+    model: z.string().max(200),
+    systemPrompt: z.string().max(12000),
+    prompt: z.string().max(50000),
+    temperature: z.number().min(0).max(2).nullable(),
+    topP: z.number().gt(0).max(1).nullable(),
+    maxOutputTokens: z.number().int().positive(),
+    image: z.object({
+      width: z.number().int().positive().nullable(),
+      height: z.number().int().positive().nullable(),
+      mimeType: z.literal("image/jpeg"),
+      bytes: z.number().int().positive(),
+    }),
+    shiftHours: z.record(z.string(), z.array(z.number().int().min(0).max(23)).max(24)),
+  }),
+  rawOutput: z.string().max(250000).nullable(),
+  rawOutputTruncated: z.boolean().default(false),
+  parsedOutput: z.unknown().nullable(),
+  normalizedDraft: z.unknown().nullable(),
+  error: z.object({
+    code: z.string().max(100),
+    message: z.string().max(2000),
+    issues: z.array(z.object({
+      path: z.string().max(500),
+      code: z.string().max(100),
+      message: z.string().max(2000),
+    })).max(100).optional(),
+  }).nullable(),
+});
+export type OreVisionDiagnostics = z.infer<typeof OreVisionDiagnosticsSchema>;

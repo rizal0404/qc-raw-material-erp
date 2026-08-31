@@ -7,7 +7,7 @@ import time
 import cv2
 import numpy as np
 from PIL import Image, ImageOps
-from parser import parse, Extractor, TEMPLATE, VERSION
+from parser import parse, parser_config, Extractor, TEMPLATE, VERSION
 from evaluation import evaluate, summarize, validate_manifest, validate_labels
 from diagnostics import export_layout
 
@@ -35,11 +35,11 @@ def set_field(document, path, value):
             node=node[key]
 
 
-def oracle_prediction(image, fields):
+def oracle_prediction(image, fields, config=None):
     """Read only human-annotated normalized boxes, isolating recognition error."""
     result={}
     with tempfile.TemporaryDirectory(prefix='limestone-oracle-') as tmp:
-        reader=Extractor(image,tmp)
+        reader=Extractor(image,tmp,config)
         for label in fields:
             box=label.get('bbox')
             if not isinstance(box,list) or len(box)!=4 or any(not isinstance(v,(int,float)) or not 0<=v<=1 for v in box) or min(box[2:])<=0 or box[0]+box[2]>1 or box[1]+box[3]>1:
@@ -62,7 +62,13 @@ def main():
     cli.add_argument('--mode',choices=['end-to-end','oracle'],default='end-to-end')
     cli.add_argument('--report',help='Write metrics/errors JSON (no image bytes)')
     cli.add_argument('--debug-dir',help='Explicit local opt-in export of crop/overlay evidence')
+    cli.add_argument('--config',help='JSON object with legacy OCR tuning; effective config is recorded in metrics')
     args=cli.parse_args()
+    if args.result and args.config: cli.error('--config cannot tune a cached --result')
+    try:
+        config=parser_config(json.loads(Path(args.config).read_text(encoding='utf-8')) if args.config else None)
+    except (OSError, ValueError) as error:
+        cli.error(str(error))
     if args.manifest:
         if args.image or args.labels or args.result or args.output: cli.error('--manifest cannot be combined with single-photo arguments')
         manifest_path=Path(args.manifest)
@@ -82,14 +88,14 @@ def main():
         fields=sample.get('fields')
         if fields is not None: validate_labels(fields)
         if args.mode=='oracle':
-            draft=oracle_prediction(normalized_image(sample['image']),fields)
-            result={'result':{'draft':draft,'parserVersion':VERSION}}
+            draft=oracle_prediction(normalized_image(sample['image']),fields,config)
+            result={'result':{'draft':draft,'parserVersion':VERSION},'diagnostics':{'engine':'LEGACY_OCR','effectiveConfig':config}}
         else:
-            result=json.loads(Path(args.result).read_text(encoding='utf-8')) if args.result else parse(Path(sample['image']).read_bytes(),SHIFTS)
+            result=json.loads(Path(args.result).read_text(encoding='utf-8')) if args.result else parse(Path(sample['image']).read_bytes(),SHIFTS,config)
             draft=result['result']['draft']
         run={'sampleId':sample['id'],'documentId':sample['documentId'],'labelStatus':sample.get('labelStatus','unlabeled'),
              'parserVersion':result['result']['parserVersion'],'mode':args.mode,'durationSeconds':round(time.perf_counter()-start,3),
-             'usedCachedResult':bool(args.result)}
+             'usedCachedResult':bool(args.result),'effectiveConfig':result.get('diagnostics',{}).get('effectiveConfig')}
         if fields:
             run.update(evaluate(draft,fields))
         else:

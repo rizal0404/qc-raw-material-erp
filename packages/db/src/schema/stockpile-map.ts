@@ -73,6 +73,8 @@ export const stockpileLayers = pgTable('stockpile_layers', {
   endPosition: numeric('end_position', { precision: 12, scale: 4 }).notNull(),
   bottomLevel: numeric('bottom_level', { precision: 12, scale: 4 }).notNull(),
   topLevel: numeric('top_level', { precision: 12, scale: 4 }).notNull(),
+  startDepth: numeric('start_depth', { precision: 12, scale: 4 }).notNull().default('0'),
+  endDepth: numeric('end_depth', { precision: 12, scale: 4 }).notNull().default('100'),
   version: integer('version').notNull().default(1),
   createdBy: uuid('created_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
   updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'restrict' }),
@@ -82,6 +84,7 @@ export const stockpileLayers = pgTable('stockpile_layers', {
   index('stockpile_layers_lot_idx').on(t.lotId),
   index('stockpile_layers_created_by_idx').on(t.createdBy),
   index('stockpile_layers_updated_by_idx').on(t.updatedBy),
+  check('stockpile_layers_depth_check', sql`${t.startDepth} >= 0 AND ${t.endDepth} <= 100 AND ${t.endDepth} > ${t.startDepth}`),
   check('stockpile_layers_geometry_check', sql`${t.startPosition} >= 0 AND ${t.endPosition} > ${t.startPosition} AND ${t.bottomLevel} >= 0 AND ${t.topLevel} > ${t.bottomLevel} AND ${t.version} > 0`),
 ]);
 
@@ -122,6 +125,8 @@ export const stockpileLayerVersions = pgTable('stockpile_layer_versions', {
   endPosition: numeric('end_position', { precision: 12, scale: 4 }).notNull(),
   bottomLevel: numeric('bottom_level', { precision: 12, scale: 4 }).notNull(),
   topLevel: numeric('top_level', { precision: 12, scale: 4 }).notNull(),
+  startDepth: numeric('start_depth', { precision: 12, scale: 4 }).notNull().default('0'),
+  endDepth: numeric('end_depth', { precision: 12, scale: 4 }).notNull().default('100'),
   version: integer('version').notNull(),
   mixIds: jsonb('mix_ids').$type<string[]>().notNull().default([]),
   effectiveAt: timestamp('effective_at', { withTimezone: true }).notNull().defaultNow(),
@@ -129,6 +134,7 @@ export const stockpileLayerVersions = pgTable('stockpile_layer_versions', {
 }, (t) => [
   index('stockpile_layer_versions_layer_effective_idx').on(t.layerId, t.effectiveAt),
   index('stockpile_layer_versions_lot_effective_idx').on(t.lotId, t.effectiveAt),
+  check('stockpile_layer_versions_depth_check', sql`${t.startDepth} >= 0 AND ${t.endDepth} <= 100 AND ${t.endDepth} > ${t.startDepth}`),
   check('stockpile_layer_versions_geometry_check', sql`${t.startPosition} >= 0 AND ${t.endPosition} > ${t.startPosition} AND ${t.bottomLevel} >= 0 AND ${t.topLevel} > ${t.bottomLevel} AND ${t.version} > 0`),
 ]);
 

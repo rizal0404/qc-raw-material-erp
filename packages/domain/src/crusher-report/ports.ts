@@ -3,6 +3,7 @@ import type {
   CrusherReportImport,
   CrusherReportIssue,
   CrusherReportWorkerResult,
+  OreVisionDiagnostics,
 } from "@qc/contracts";
 import type {
   AssignmentAaResolutionRecord,
@@ -66,6 +67,11 @@ export interface CrusherReportRepository {
     result: CrusherReportWorkerResult,
     aligned: Buffer,
   ): Promise<void>;
-  fail(id: string, leaseToken: string, message: string): Promise<void>;
+  fail(
+    id: string,
+    leaseToken: string,
+    message: string,
+    diagnostics?: OreVisionDiagnostics,
+  ): Promise<void>;
   requeue(id: string): Promise<void>;
 }

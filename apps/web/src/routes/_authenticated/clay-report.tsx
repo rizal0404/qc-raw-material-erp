@@ -6,6 +6,7 @@ import { authQueryOptions } from '../../features/auth/auth-query';
 import { masterLookupsFor } from '../../features/qc/qc-api';
 import { ensureClayReport, getCurrentClayReport } from '../../features/clay-report/clay-report-api';
 import { ClayHeading, ClayReportForm, ContextFields } from '../../features/clay-report/clay-report-form';
+import { ClayPhotoExtractor } from '../../features/clay-report/clay-photo-extractor';
 import { FormSection } from '../../features/clay-report/clay-form-parts';
 import { currentShiftContext } from '../../features/clay-report/clay-form-model';
 import { ApiClientError } from '../../lib/api-client';
@@ -23,6 +24,7 @@ function ClayReportPage() {
     return { ...lookup.data, crushers };
   }, [lookup.data, user]);
   const [context, setContext] = useState<ClayReportContext | null>(null);
+  const [mode, setMode] = useState<'manual' | 'photo'>('manual');
   const [creating, setCreating] = useState(false), [error, setError] = useState('');
   useEffect(() => {
     if (!context && scopedLookup?.crushers[0]) {
@@ -57,9 +59,19 @@ function ClayReportPage() {
   if (!scopedLookup) return <div className="clay-page clay-empty" role="status">Memuat daftar unit dan shift…</div>;
   if (!scopedLookup.crushers.length) return <div className="clay-page clay-empty"><h1>Laporan Harian Crusher</h1><p>Belum ada Clay Crusher yang dapat Anda akses. Hubungi Supervisor untuk pengaturan unit.</p></div>;
   if (!context) return <div className="clay-page clay-empty" role="status">Menyiapkan konteks laporan…</div>;
-  if (reportQuery.data?.report && user) return <ClayReportForm key={reportQuery.data.report.id} report={reportQuery.data.report} lookup={scopedLookup} role={user.role} onReport={onReport} onContextChange={changeContext} />;
+  const modeNavigation = <div className="clay-mode-tabs" role="tablist" aria-label="Sumber laporan Clay">
+    <button type="button" role="tab" aria-selected={mode === 'manual'} onClick={() => setMode('manual')}>Form digital</button>
+    <button type="button" role="tab" aria-selected={mode === 'photo'} onClick={() => setMode('photo')}>Laporan foto / gambar</button>
+  </div>;
+  if (mode === 'photo' && user) return <div className="clay-page">
+    <ClayHeading unit={scopedLookup.crushers.find(x => x.id === context.crusherId)?.label ?? ''} date={context.operationDate} shift={context.shiftCode} />
+    {modeNavigation}
+    <ClayPhotoExtractor lookup={scopedLookup} role={user.role} active />
+  </div>;
+  if (reportQuery.data?.report && user) return <ClayReportForm key={reportQuery.data.report.id} report={reportQuery.data.report} lookup={scopedLookup} role={user.role} onReport={onReport} onContextChange={changeContext} modeNavigation={modeNavigation} />;
   return <div className="clay-page">
     <ClayHeading unit={scopedLookup.crushers.find(x => x.id === context.crusherId)?.label ?? ''} date={context.operationDate} shift={context.shiftCode} />
+    {modeNavigation}
     <FormSection title="Informasi operasi" description="Pilih tanggal, shift, dan unit untuk membuka laporan."><ContextFields context={context} lookup={scopedLookup} onChange={changeContext} disabled={creating} /></FormSection>
     {reportQuery.isError ? <div className="clay-message error" role="alert"><p>Laporan gagal dimuat: {reportQuery.error.message}</p><button className="btn" onClick={() => void reportQuery.refetch()}>Coba lagi</button></div> : reportQuery.isFetching ? <div className="clay-empty" role="status">Memuat laporan…</div> : <section className="clay-section clay-empty"><span className="clay-empty-symbol" aria-hidden="true">▤</span><h2>Mulai laporan shift ini</h2><p>Belum ada laporan untuk konteks yang dipilih. Buat draft, lalu isi ringkasan, distribusi material, dan gangguan operasi.</p><button className="btn primary" disabled={creating || !context.crusherId} onClick={() => void createReport()}>{creating ? 'Membuat draft…' : 'Buat laporan baru'}</button></section>}
     {error && <p className="clay-message error" role="alert">{error}</p>}

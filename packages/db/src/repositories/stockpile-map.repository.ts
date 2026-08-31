@@ -22,14 +22,14 @@ function mixSummary(row:Record<string,unknown>,layerId?:string):StockpileMixSumm
 function layoutRecord(row:any):WarehouseLayoutRecord{return{id:row.id,code:row.code,name:row.name,materialKind:row.materialKind,plantId:row.plantId,plantCode:row.plantCode,plantName:row.plantName,axisLength:Number(row.axisLength),maxLevel:Number(row.maxLevel),postMarks:Array.isArray(row.postMarks)?row.postMarks.map((mark:any)=>({position:Number(mark.position),label:String(mark.label)})):[],hopperSide:row.hopperSide as 'START'|'END',active:row.active,createdAt:row.createdAt,updatedAt:row.updatedAt};}
 function zoneRecord(row:typeof warehouseZones.$inferSelect):WarehouseZoneRecord{return{id:row.id,layoutId:row.layoutId,code:row.code,label:row.label,kind:row.kind,startPosition:Number(row.startPosition),endPosition:Number(row.endPosition),bottomLevel:Number(row.bottomLevel),topLevel:Number(row.topLevel),displayOrder:row.displayOrder};}
 function lotRecord(row:any):StockpileLotRecord{return{id:row.id,layoutId:row.layoutId,logicalPileId:row.logicalPileId,logicalPileCode:row.logicalPileCode,logicalPileName:row.logicalPileName,className:row.className,lotNo:row.lotNo,lotNoMode:row.lotNoMode,pileCycle:row.pileCycle,status:row.status,reclaimedAt:row.reclaimedAt,createdAt:row.createdAt,updatedAt:row.updatedAt};}
-function layerRecord(row:any):StockpileLayerRecord{return{id:row.id,lotId:row.lotId,layoutId:row.layoutId,lotNo:row.lotNo,lotStatus:row.lotStatus,label:row.label,startPosition:Number(row.startPosition),endPosition:Number(row.endPosition),bottomLevel:Number(row.bottomLevel),topLevel:Number(row.topLevel),version:row.version,createdAt:row.createdAt,updatedAt:row.updatedAt};}
+function layerRecord(row:any):StockpileLayerRecord{return{id:row.id,lotId:row.lotId,layoutId:row.layoutId,lotNo:row.lotNo,lotStatus:row.lotStatus,label:row.label,startPosition:Number(row.startPosition),endPosition:Number(row.endPosition),bottomLevel:Number(row.bottomLevel),topLevel:Number(row.topLevel),startDepth:Number(row.startDepth),endDepth:Number(row.endDepth),version:row.version,createdAt:row.createdAt,updatedAt:row.updatedAt};}
 
 export function createStockpileMapRepository(db:PostgresJsDatabase<typeof Schema>):StockpileMapRepository{
   const layoutSelection={id:warehouseLayouts.id,code:warehouseLayouts.code,name:warehouseLayouts.name,materialKind:warehouseLayouts.materialKind,plantId:warehouseLayouts.plantId,plantCode:plants.code,plantName:plants.name,axisLength:warehouseLayouts.axisLength,maxLevel:warehouseLayouts.maxLevel,postMarks:warehouseLayouts.postMarks,hopperSide:warehouseLayouts.hopperSide,active:warehouseLayouts.active,createdAt:warehouseLayouts.createdAt,updatedAt:warehouseLayouts.updatedAt};
   const lotSelection={id:stockpileLots.id,layoutId:stockpileLots.layoutId,logicalPileId:stockpileLots.logicalPileId,logicalPileCode:piles.code,logicalPileName:piles.name,className:piles.className,lotNo:stockpileLots.lotNo,lotNoMode:stockpileLots.lotNoMode,pileCycle:stockpileLots.pileCycle,status:stockpileLots.status,reclaimedAt:stockpileLots.reclaimedAt,createdAt:stockpileLots.createdAt,updatedAt:stockpileLots.updatedAt};
-  const layerSelection={id:stockpileLayers.id,lotId:stockpileLayers.lotId,layoutId:stockpileLots.layoutId,lotNo:stockpileLots.lotNo,lotStatus:stockpileLots.status,label:stockpileLayers.label,startPosition:stockpileLayers.startPosition,endPosition:stockpileLayers.endPosition,bottomLevel:stockpileLayers.bottomLevel,topLevel:stockpileLayers.topLevel,version:stockpileLayers.version,createdAt:stockpileLayers.createdAt,updatedAt:stockpileLayers.updatedAt};
+  const layerSelection={id:stockpileLayers.id,lotId:stockpileLayers.lotId,layoutId:stockpileLots.layoutId,lotNo:stockpileLots.lotNo,lotStatus:stockpileLots.status,label:stockpileLayers.label,startPosition:stockpileLayers.startPosition,endPosition:stockpileLayers.endPosition,bottomLevel:stockpileLayers.bottomLevel,topLevel:stockpileLayers.topLevel,startDepth:stockpileLayers.startDepth,endDepth:stockpileLayers.endDepth,version:stockpileLayers.version,createdAt:stockpileLayers.createdAt,updatedAt:stockpileLayers.updatedAt};
 
-  async function assertNoCollision(tx:any,layoutId:string,rectangle:{startPosition:number;endPosition:number;bottomLevel:number;topLevel:number},excludeLayerId?:string){
+  async function assertNoCollision(tx:any,layoutId:string,rectangle:{startPosition:number;endPosition:number;bottomLevel:number;topLevel:number;startDepth:number;endDepth:number},excludeLayerId?:string){
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'stockpile-map:'+layoutId}))`);
     const rows=await tx.execute(sql`
       SELECT sl.id FROM stockpile_layers sl JOIN stockpile_lots lot ON lot.id=sl.lot_id
@@ -37,6 +37,7 @@ export function createStockpileMapRepository(db:PostgresJsDatabase<typeof Schema
         ${excludeLayerId?sql`AND sl.id<>${excludeLayerId}::uuid`:sql``}
         AND greatest(sl.start_position,${rectangle.startPosition})<least(sl.end_position,${rectangle.endPosition})
         AND greatest(sl.bottom_level,${rectangle.bottomLevel})<least(sl.top_level,${rectangle.topLevel})
+        AND greatest(sl.start_depth,${rectangle.startDepth})<least(sl.end_depth,${rectangle.endDepth})
       LIMIT 1 FOR UPDATE OF sl`);
     if((rows as unknown as unknown[]).length)throw new Error('STOCKPILE_LAYER_COLLISION');
   }
@@ -89,7 +90,7 @@ export function createStockpileMapRepository(db:PostgresJsDatabase<typeof Schema
       SELECT version.layer_id AS "id",version.lot_id AS "lotId",lot.layout_id AS "layoutId",
         lot.lot_no AS "lotNo",lot.status AS "lotStatus",version.label,
         version.start_position AS "startPosition",version.end_position AS "endPosition",
-        version.bottom_level AS "bottomLevel",version.top_level AS "topLevel",version.version,
+        version.bottom_level AS "bottomLevel",version.top_level AS "topLevel",version.start_depth AS "startDepth",version.end_depth AS "endDepth",version.version,
         layer.created_at AS "createdAt",version.effective_at AS "updatedAt"
       FROM latest_layer version
       JOIN latest_lot lot ON lot.lot_id=version.lot_id
@@ -136,6 +137,8 @@ export function createStockpileMapRepository(db:PostgresJsDatabase<typeof Schema
       ORDER BY v.operation_date DESC,v.mix_code DESC LIMIT 500`);return(rows as unknown as Array<Record<string,unknown>>).map((row)=>mixSummary(row));},
     async findMixes(ids){return mixesQuery(ids);},
     async createLayer(input){return db.transaction(async(tx)=>{
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'stockpile-map:'+input.layoutId}))`);
+
       let lotId=input.lot.id;let createdLot=false;
       if(lotId){const[lot]=await tx.select({id:stockpileLots.id,layoutId:stockpileLots.layoutId,status:stockpileLots.status}).from(stockpileLots).where(eq(stockpileLots.id,lotId)).for('update').limit(1);if(!lot||lot.layoutId!==input.layoutId)throw new Error('STOCKPILE_LOT_NOT_FOUND');if(lot.status!=='ACTIVE')throw new Error('STOCKPILE_LOT_RECLAIMED');}
       else{
@@ -144,26 +147,31 @@ export function createStockpileMapRepository(db:PostgresJsDatabase<typeof Schema
       }
       if(createdLot)await tx.insert(stockpileLotVersions).values({lotId:lotId!,layoutId:input.layoutId,logicalPileId:input.lot.logicalPileId,lotNo:input.lot.lotNo,lotNoMode:input.lot.lotNoMode,pileCycle:input.lot.pileCycle,status:'ACTIVE',reclaimedAt:null,changedBy:input.actorUserId});
       await assertNoCollision(tx,input.layoutId,input.layer);
-      const[layer]=await tx.insert(stockpileLayers).values({lotId:lotId!,label:input.layer.label,startPosition:String(input.layer.startPosition),endPosition:String(input.layer.endPosition),bottomLevel:String(input.layer.bottomLevel),topLevel:String(input.layer.topLevel),createdBy:input.actorUserId,updatedBy:input.actorUserId}).returning({id:stockpileLayers.id});
+      const[layer]=await tx.insert(stockpileLayers).values({lotId:lotId!,label:input.layer.label,startPosition:String(input.layer.startPosition),endPosition:String(input.layer.endPosition),bottomLevel:String(input.layer.bottomLevel),topLevel:String(input.layer.topLevel),startDepth:String(input.layer.startDepth),endDepth:String(input.layer.endDepth),createdBy:input.actorUserId,updatedBy:input.actorUserId}).returning({id:stockpileLayers.id});
       await tx.insert(stockpileLayerMixes).values(input.mixIds.map((mixId,index)=>({layerId:layer!.id,mixId,displayOrder:index})));
-      await tx.insert(stockpileLayerVersions).values({layerId:layer!.id,lotId:lotId!,label:input.layer.label,startPosition:String(input.layer.startPosition),endPosition:String(input.layer.endPosition),bottomLevel:String(input.layer.bottomLevel),topLevel:String(input.layer.topLevel),version:1,mixIds:input.mixIds,changedBy:input.actorUserId});
+      await tx.insert(stockpileLayerVersions).values({layerId:layer!.id,lotId:lotId!,label:input.layer.label,startPosition:String(input.layer.startPosition),endPosition:String(input.layer.endPosition),bottomLevel:String(input.layer.bottomLevel),topLevel:String(input.layer.topLevel),startDepth:String(input.layer.startDepth),endDepth:String(input.layer.endDepth),version:1,mixIds:input.mixIds,changedBy:input.actorUserId});
       return{lotId:lotId!,layerId:layer!.id};
     });},
     async updateLayer(input){await db.transaction(async(tx)=>{
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'stockpile-map:'+input.layoutId}))`);
+
       const[current]=await tx.select({id:stockpileLayers.id,version:stockpileLayers.version,status:stockpileLots.status}).from(stockpileLayers).innerJoin(stockpileLots,eq(stockpileLots.id,stockpileLayers.lotId)).where(eq(stockpileLayers.id,input.id)).for('update').limit(1);
       if(!current)throw new Error('STOCKPILE_LAYER_NOT_FOUND');if(current.version!==input.expectedVersion)throw new Error('STOCKPILE_VERSION_CONFLICT');if(current.status!=='ACTIVE')throw new Error('STOCKPILE_LOT_RECLAIMED');
       await assertNoCollision(tx,input.layoutId,input,input.id);
-      await tx.update(stockpileLayers).set({label:input.label,startPosition:String(input.startPosition),endPosition:String(input.endPosition),bottomLevel:String(input.bottomLevel),topLevel:String(input.topLevel),version:input.expectedVersion+1,updatedBy:input.actorUserId,updatedAt:new Date()}).where(eq(stockpileLayers.id,input.id));
+      await tx.update(stockpileLayers).set({label:input.label,startPosition:String(input.startPosition),endPosition:String(input.endPosition),bottomLevel:String(input.bottomLevel),topLevel:String(input.topLevel),startDepth:String(input.startDepth),endDepth:String(input.endDepth),version:input.expectedVersion+1,updatedBy:input.actorUserId,updatedAt:new Date()}).where(eq(stockpileLayers.id,input.id));
       await tx.delete(stockpileLayerMixes).where(eq(stockpileLayerMixes.layerId,input.id));
       await tx.insert(stockpileLayerMixes).values(input.mixIds.map((mixId,index)=>({layerId:input.id,mixId,displayOrder:index})));
       const[layer]=await tx.select({lotId:stockpileLayers.lotId}).from(stockpileLayers).where(eq(stockpileLayers.id,input.id)).limit(1);
-      await tx.insert(stockpileLayerVersions).values({layerId:input.id,lotId:layer!.lotId,label:input.label,startPosition:String(input.startPosition),endPosition:String(input.endPosition),bottomLevel:String(input.bottomLevel),topLevel:String(input.topLevel),version:input.expectedVersion+1,mixIds:input.mixIds,changedBy:input.actorUserId});
+      await tx.insert(stockpileLayerVersions).values({layerId:input.id,lotId:layer!.lotId,label:input.label,startPosition:String(input.startPosition),endPosition:String(input.endPosition),bottomLevel:String(input.bottomLevel),topLevel:String(input.topLevel),startDepth:String(input.startDepth),endDepth:String(input.endDepth),version:input.expectedVersion+1,mixIds:input.mixIds,changedBy:input.actorUserId});
     });},
     async updateLot(input){await db.transaction(async(tx)=>{
+      // Layout is immutable. Acquire the warehouse lock before ANY row lock.
+      const [context]=await tx.select({layoutId:stockpileLots.layoutId}).from(stockpileLots).where(eq(stockpileLots.id,input.id)).limit(1);
+      if(!context)throw new Error('STOCKPILE_LOT_NOT_FOUND');
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'stockpile-map:'+context.layoutId}))`);
       const[current]=await tx.select({id:stockpileLots.id,layoutId:stockpileLots.layoutId,status:stockpileLots.status}).from(stockpileLots).where(eq(stockpileLots.id,input.id)).for('update').limit(1);if(!current)throw new Error('STOCKPILE_LOT_NOT_FOUND');
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'stockpile-map:'+current.layoutId}))`);
       if(current.status==='RECLAIMED'&&input.status==='ACTIVE'){
-        const collisions=await tx.execute(sql`SELECT 1 FROM stockpile_layers own JOIN stockpile_layers other ON other.id<>own.id JOIN stockpile_lots other_lot ON other_lot.id=other.lot_id WHERE own.lot_id=${input.id}::uuid AND other_lot.layout_id=${current.layoutId}::uuid AND other_lot.status='ACTIVE' AND greatest(own.start_position,other.start_position)<least(own.end_position,other.end_position) AND greatest(own.bottom_level,other.bottom_level)<least(own.top_level,other.top_level) LIMIT 1`);if((collisions as unknown as unknown[]).length)throw new Error('STOCKPILE_LAYER_COLLISION');
+        const collisions=await tx.execute(sql`SELECT 1 FROM stockpile_layers own JOIN stockpile_layers other ON other.id<>own.id JOIN stockpile_lots other_lot ON other_lot.id=other.lot_id WHERE own.lot_id=${input.id}::uuid AND other_lot.layout_id=${current.layoutId}::uuid AND other_lot.status='ACTIVE' AND greatest(own.start_position,other.start_position)<least(own.end_position,other.end_position) AND greatest(own.bottom_level,other.bottom_level)<least(own.top_level,other.top_level) AND greatest(own.start_depth,other.start_depth)<least(own.end_depth,other.end_depth) LIMIT 1`);if((collisions as unknown as unknown[]).length)throw new Error('STOCKPILE_LAYER_COLLISION');
       }
       await tx.update(stockpileLots).set({status:input.status,lotNo:input.lotNo,lotNoMode:input.lotNoMode,reclaimedAt:input.status==='RECLAIMED'?new Date():null,updatedBy:input.actorUserId,updatedAt:new Date()}).where(eq(stockpileLots.id,input.id));
       const[updated]=await tx.select().from(stockpileLots).where(eq(stockpileLots.id,input.id)).limit(1);

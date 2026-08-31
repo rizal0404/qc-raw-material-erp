@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { IsoDateSchema } from "./dates";
 import { ShiftCodeSchema } from "./vendor-operation";
-import { OreVisionDocumentSchema } from "./orevision";
+import { OreVisionDiagnosticsSchema, OreVisionDocumentSchema } from "./orevision";
 
 const nullableNumber = z.number().finite().nullable();
 const count = z.number().int().min(0).max(5000).nullable();
@@ -118,6 +118,7 @@ export const CrusherReportWorkerResultSchema = z.object({
   issues: z.array(CrusherReportIssueSchema).max(100),
   parserVersion: z.string().max(32),
   templateVersion: z.string().max(32),
+  diagnostics: OreVisionDiagnosticsSchema.optional(),
 });
 export const CrusherReportImportStatusSchema = z.enum([
   "QUEUED",
@@ -144,6 +145,7 @@ export const CrusherReportImportSchema = z.object({
   error: z.string().nullable(),
   hasAlignedImage: z.boolean(),
   reportId: z.string().uuid().nullable(),
+  diagnostics: OreVisionDiagnosticsSchema.nullable().optional(),
 });
 export const UpdateCrusherReportDraftSchema = z.object({
   revision: z.number().int().positive(),

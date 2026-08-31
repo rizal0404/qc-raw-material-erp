@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { OreVisionSettingsSchema } from "@qc/contracts";
+import type { OreVisionSettingsInput } from "@qc/contracts";
 import { createOreVisionSettings } from "./settings";
 import { callVision, listGeminiModels } from "./provider";
 import { AppError } from "../../lib/errors";
@@ -20,12 +20,12 @@ export async function registerOreVisionRoutes(app: FastifyInstance) {
   );
   app.put("/orevision/settings", admin, async (request) => ({
     ok: true,
-    item: await store.save(OreVisionSettingsSchema.parse(request.body)),
+    item: await store.save(request.body as OreVisionSettingsInput),
   }));
   let testing = false;
   app.post("/orevision/models", admin, async (request) => {
     const settings = await store.resolveInput(
-      OreVisionSettingsSchema.parse(request.body),
+      request.body as OreVisionSettingsInput,
     );
     return { ok: true, items: await listGeminiModels(settings) };
   });
@@ -39,7 +39,7 @@ export async function registerOreVisionRoutes(app: FastifyInstance) {
     testing = true;
     try {
       const settings = await store.resolveInput(
-        OreVisionSettingsSchema.parse(request.body),
+        request.body as OreVisionSettingsInput,
       );
       await callVision(
         settings,

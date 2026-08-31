@@ -92,6 +92,8 @@ export const StockpileLayerSchema = z.object({
   endPosition: z.number(),
   bottomLevel: z.number(),
   topLevel: z.number(),
+  startDepth: LevelSchema.optional(),
+  endDepth: LevelSchema.optional(),
   version: z.number().int().positive(),
   mixes: z.array(StockpileMixSummarySchema),
   totalTon: z.number().nonnegative(),
@@ -133,6 +135,8 @@ export const CreateStockpileLayerRequestSchema = z.object({
   endPosition: CoordinateSchema,
   bottomLevel: LevelSchema,
   topLevel: LevelSchema,
+  startDepth: LevelSchema.optional(),
+  endDepth: LevelSchema.optional(),
 }).superRefine((value, ctx) => {
   if (!value.lotId && !value.logicalPileId) ctx.addIssue({ code: 'custom', path: ['logicalPileId'], message: 'Logical pile wajib untuk lot baru.' });
   if (!value.lotId && !value.pileCycle) ctx.addIssue({ code: 'custom', path: ['pileCycle'], message: 'Pile cycle wajib untuk lot baru.' });
@@ -149,6 +153,8 @@ export const UpdateStockpileLayerRequestSchema = z.object({
   endPosition: CoordinateSchema.optional(),
   bottomLevel: LevelSchema.optional(),
   topLevel: LevelSchema.optional(),
+  startDepth: LevelSchema.optional(),
+  endDepth: LevelSchema.optional(),
 }).refine((value) => Object.keys(value).some((key) => key !== 'expectedVersion'), { message: 'Tidak ada field yang diubah.' });
 
 export const UpdateStockpileLotRequestSchema = z.object({
@@ -169,6 +175,7 @@ export const StockpileMapResponseSchema = z.object({
   ok: z.literal(true),
   asOf: z.string().date(),
   isHistorical: z.boolean(),
+  geometryEditing: z.boolean().optional(),
   layout: WarehouseLayoutSchema,
   zones: z.array(WarehouseZoneSchema),
   lots: z.array(StockpileLotSchema),

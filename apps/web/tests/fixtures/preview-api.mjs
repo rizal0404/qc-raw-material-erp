@@ -1,6 +1,19 @@
-// Read-only, loopback-only UI fixture. Never connects to Supabase or application sessions.
+// Default read-only, loopback-only UI fixture. PREVIEW_STOCKPILE_EDIT opts into synthetic in-memory writes.
+// Never connects to Supabase or application sessions.
 // Run manually with: node apps/web/tests/fixtures/preview-api.mjs
 import { createServer } from 'node:http';
+import { stockpilePreview } from './stockpile-preview-data.mjs';
+const port = Number(process.env.PREVIEW_PORT || 5399);
+// Explicit opt-in mutable SYNTHETIC fixture. Never connects to a real API/database.
+const editPreview = process.env.PREVIEW_STOCKPILE_EDIT === '1';
+const geometryOverrides = new Map();
+function editablePreview(layout, params) {
+  const data = stockpilePreview(layout, params, date);
+  return { ...data, geometryEditing: editPreview, layers: data.layers.map(layer => ({
+    ...layer, startDepth: 39 * layer.bottomLevel / layout.maxLevel, endDepth: 100 - 39 * layer.bottomLevel / layout.maxLevel,
+    ...(!data.isHistorical ? geometryOverrides.get(layer.id) : {}),
+  })) };
+}
 
 const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Makassar', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const chemistry = { sio2: 12.6, al2o3: 3.2, fe2o3: 2.4, cao: 43.1, mgo: 1.7, k2o: .4, na2o: .2, so3: .1, h2o: 3 };
@@ -28,10 +41,29 @@ const server = createServer((request, response) => {
   const kind = url.searchParams.get('materialKind') === 'CL' ? 'CL' : 'LS';
   const route = url.pathname.replace('/api/v1', '');
   response.setHeader('content-type', 'application/json');
-  response.setHeader('access-control-allow-origin', 'http://localhost:5185');
+  response.setHeader('access-control-allow-origin', process.env.PREVIEW_ORIGIN || 'http://localhost:5185');
   response.setHeader('access-control-allow-credentials', 'true');
   const send = (data, status = 200) => { response.statusCode = status; response.end(JSON.stringify(data)); };
-  if (request.method === 'OPTIONS') { response.setHeader('access-control-allow-headers', 'content-type'); return send({ ok: true }); }
+  if (request.method === 'OPTIONS') { response.setHeader('access-control-allow-headers', 'content-type'); response.setHeader('access-control-allow-methods', 'GET, PATCH, OPTIONS'); return send({ ok: true }); }
+  if (editPreview && request.method === 'PATCH' && route.startsWith('/stockpile-map/layers/')) {
+    const id = route.split('/').at(-1);
+    const layer = layouts.flatMap(layout => editablePreview(layout, new URLSearchParams()).layers).find(layer => layer.id === id);
+    if (!layer) return send({ok:false,message:'Layer fixture tidak ditemukan.'},404);
+    let body = '';
+    request.on('data', chunk => { body += chunk; });
+    request.on('end', () => {
+      try {
+        const input = JSON.parse(body);
+        if (input.expectedVersion !== layer.version) return send({ok:false,code:'STOCKPILE_VERSION_CONFLICT',message:'Layer telah diubah user lain.'},409);
+        const keys = ['startPosition','endPosition','bottomLevel','topLevel','startDepth','endDepth'];
+        const geometry = Object.fromEntries(keys.map(key => [key,input[key] ?? layer[key]]));
+        if (Object.values(geometry).some(n => !Number.isFinite(n))) return send({ok:false,message:'Koordinat tidak valid.'},400);
+        geometryOverrides.set(id,{...geometry,version:layer.version+1,updatedAt:new Date().toISOString()});
+        return send({ok:true,item:{id}});
+      } catch { return send({ok:false,message:'JSON tidak valid.'},400); }
+    });
+    return;
+  }
   if (request.method !== 'GET') return send({ ok: false, code: 'PREVIEW_READ_ONLY', message: 'Preview UI hanya baca; tidak ada data yang disimpan.' }, 405);
   if (route === '/auth/session') return send({ ok: true, authenticated: true, user: { id: 'preview-user', username: 'ui-preview', displayName: 'Preview UI', role: process.env.PREVIEW_ROLE || 'SUPERVISOR_ADMIN', status: 'ACTIVE', vendorId: null, crusherIds: ['crusher-LS', 'crusher-CL'], lastLoginAt: new Date().toISOString() }, session: { expiresAt: new Date(Date.now() + 3600000).toISOString() } });
   if (route === '/lookups/master') return send(lookup(kind));
@@ -43,6 +75,7 @@ const server = createServer((request, response) => {
   ]:[]});
   if (route === '/mixes' || route === '/workbench/retase-suggestions') return send({ ok: true, items: [], total: 0 });
   if (route === '/stockpile-map/layouts') return send({ ok: true, items: layouts });
+  if (route === '/stockpile-map' && process.env.PREVIEW_STOCKPILE === '1') return send(editablePreview(layouts.find(item => item.id === url.searchParams.get('layoutId')) || layouts[0], url.searchParams));
   if (route === '/stockpile-map') return send({ ok: true, asOf: date, isHistorical: false, layout: layouts.find(item => item.id === url.searchParams.get('layoutId')) || layouts[0], zones: [], lots: [], layers: [], reclaimer: null, counts: { activeLots: 0, reclaimedLots: 0, unplacedMixes: 0 } });
   if (route.startsWith('/reports/')) return send({ ok: true, items: [] });
   if (route === '/vendor/shift-reports/current') return send({ ok: true, item: null });
@@ -52,4 +85,4 @@ const server = createServer((request, response) => {
   if (route === '/retase-summary') return send({ ok: true, summary: { totalNet: 0, dumpEvents: 0, reversalEvents: 0, unassignedEvents: 0, ambiguousEvents: 0, hourly: [], byAa: [], byAm: [], byVendor: [] } });
   return send({ ok: true, items: [], total: 0 });
 });
-server.listen(5399, '127.0.0.1', () => console.log('Read-only UI fixture at http://localhost:5399 (synthetic data only)'));
+server.listen(port, '127.0.0.1', () => console.log(`${editPreview ? 'Editable in-memory' : 'Read-only'} UI fixture at http://localhost:${port} (synthetic data only)`));

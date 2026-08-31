@@ -14,3 +14,4 @@ export * from './repositories/retase.repository';
 export * from './repositories/reconciliation.repository';
 export * from './repositories/stockpile-map.repository';
 export * from './repositories/crusher-report.repository';
+export * from './repositories/clay-photo-report.repository';

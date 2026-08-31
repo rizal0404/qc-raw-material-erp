@@ -5,12 +5,12 @@ import type { ReclaimerPositionRecord, StockpileLayerRecord, StockpileLotRecord,
 export interface CreateStockpileLayerRepositoryInput {
   layoutId:string;
   lot:{id?:string;logicalPileId:string;lotNo:string;lotNoMode:StockpileLotNoMode;pileCycle:number};
-  layer:{label:string|null;startPosition:number;endPosition:number;bottomLevel:number;topLevel:number};
+  layer:{label:string|null;startPosition:number;endPosition:number;bottomLevel:number;topLevel:number;startDepth:number;endDepth:number};
   mixIds:string[];
   actorUserId:string;
 }
 export interface UpdateStockpileLayerRepositoryInput {
-  id:string;layoutId:string;expectedVersion:number;label:string|null;startPosition:number;endPosition:number;bottomLevel:number;topLevel:number;mixIds:string[];actorUserId:string;
+  id:string;layoutId:string;expectedVersion:number;label:string|null;startPosition:number;endPosition:number;bottomLevel:number;topLevel:number;startDepth:number;endDepth:number;mixIds:string[];actorUserId:string;
 }
 export interface UpdateStockpileLotRepositoryInput { id:string;status:StockpileLotStatus;lotNo:string;lotNoMode:StockpileLotNoMode;actorUserId:string; }
 

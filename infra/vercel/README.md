@@ -41,3 +41,21 @@ VITE_API_BASE_URL=https://your-api-project.vercel.app/api/v1
 ```
 
 After changing Root Directory, environment variables, or `vercel.json`, redeploy without the previous build cache. Verify `GET /api/v1/health` before testing login.
+
+## Release checklist: 3D piles and photo reports
+
+- Both app packages require Node.js 24.x, matching the API bundle target. The web configuration includes the [Vite SPA rewrite](https://vercel.com/docs/frameworks/frontend/vite) so direct navigation and refresh on `/peta-mutu` and `/clay-report` work.
+- Apply pending database migrations through the existing migration workflow before routing production traffic to this release: `0021_clay_photo_report_import.sql` adds Clay import persistence; `0022_stockpile_layer_depth.sql` adds depth coordinates for current and historical pile layers. Git push and Vercel builds do **not** apply these migrations. A missing migration can cause API requests to return HTTP 500. Back up the database and verify the migration target before applying changes.
+- Enable Fluid compute and verify an API function maximum duration of at least 300 seconds in Vercel Project Settings. Image extraction can wait up to 240 seconds for its provider. See [function duration](https://vercel.com/docs/functions/configuring-functions/duration). Uploads remain limited to 4 MiB, below Vercel's request body limit.
+- No new mandatory environment variables are introduced by the 3D editor or Clay photo import. Photo extraction reuses the existing OreVision provider configuration, for example:
+
+  ```dotenv
+  OREVISION_PROVIDER=gemini
+  OREVISION_MODEL=gemini-2.5-flash
+  OREVISION_GEMINI_API_KEY=<provider-secret>
+  ```
+
+  For another provider, set its corresponding existing key (`OREVISION_OPENAI_API_KEY`, `OREVISION_OPENROUTER_API_KEY`, or `OREVISION_CUSTOM_API_KEY`) and, for a custom provider, `OREVISION_CUSTOM_ENDPOINTS`. Keep provider keys in the API project only.
+- OreVision settings edited in the UI are stored in `/tmp` on Vercel: they are instance-local and can disappear on cold starts. Keep provider/model/key defaults in environment variables. UI prompt and sampling adjustments are not durable across serverless instances; persistent shared settings storage is not part of this release.
+- The standalone Python OCR/training service is not part of the Vercel API runtime. Local training output and environment snapshots are excluded from Git and deployment uploads.
+- After deployment, check health, login, direct route refresh, stockpile loading, layer drag/resize persistence after reload, and Clay photo extraction. Local build/test success is not a substitute for these production checks.

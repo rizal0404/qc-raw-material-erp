@@ -11,6 +11,7 @@ import base64
 import csv
 import io
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -28,6 +29,49 @@ from recognizer import load_recognizer
 
 VERSION = "0.3.0"
 TEMPLATE = json.loads(Path(__file__).with_name("template.json").read_text(encoding="utf-8"))
+
+# This is the legacy local OCR engine, not the production VLM. Keep tuning
+# explicit and bounded so a benchmark is reproducible and cannot inject CLI args.
+DEFAULT_CONFIG = {
+    "modelConfidenceThreshold": 0.3,
+    "tesseractPsm": 7,
+    "tesseractScale": 3,
+    "tesseractTimeoutSeconds": 15,
+    "claheClipLimit": 2,
+    "adaptiveThresholdBlockSize": 31,
+    "adaptiveThresholdC": 12,
+    "maxCount": 5000,
+}
+
+
+def parser_config(config=None):
+    if config is None:
+        config = {}
+    if not isinstance(config, dict):
+        raise ValueError("Parser config must be an object")
+    unknown = set(config) - set(DEFAULT_CONFIG)
+    if unknown:
+        raise ValueError("Unknown legacy OCR config: " + ", ".join(sorted(map(str, unknown))))
+    effective = {**DEFAULT_CONFIG, **config}
+    ranges = {
+        "modelConfidenceThreshold": (0, 1, False),
+        "tesseractPsm": (3, 13, True),
+        "tesseractScale": (1, 5, False),
+        "tesseractTimeoutSeconds": (1, 60, False),
+        "claheClipLimit": (0.1, 10, False),
+        "adaptiveThresholdBlockSize": (3, 99, True),
+        "adaptiveThresholdC": (-30, 30, False),
+        "maxCount": (1, 5000, True),
+    }
+    for key, (lower, upper, integer) in ranges.items():
+        value = effective[key]
+        if (isinstance(value, bool) or not isinstance(value, (int, float))
+                or not math.isfinite(value) or not lower <= value <= upper
+                or (integer and not isinstance(value, int))):
+            raise ValueError(f"Invalid legacy OCR config {key}; expected {'integer' if integer else 'number'} in [{lower}, {upper}]")
+    if effective["adaptiveThresholdBlockSize"] % 2 == 0:
+        raise ValueError("adaptiveThresholdBlockSize must be odd")
+    return effective
 
 
 def number(raw, field):
@@ -76,16 +120,18 @@ def align(source):
 
 
 class Extractor:
-    def __init__(self, image, directory):
+    def __init__(self, image, directory, config=None):
         self.image = image
         self.directory = Path(directory)
+        self.config = parser_config(config)
         self.observations = []
         self.tesseract = os.environ.get("TESSERACT_CMD") or shutil.which("tesseract")
         if not self.tesseract:
             raise RuntimeError("Tesseract CLI tidak ditemukan. Set TESSERACT_CMD.")
         self.dt_recognizer = load_recognizer()
 
-    def read(self, field, box, kind="text", psm=7, quad=None, geometry="TEMPLATE"):
+    def read(self, field, box, kind="text", psm=None, quad=None, geometry="TEMPLATE"):
+        psm = self.config["tesseractPsm"] if psm is None else psm
         h, w = self.image.shape[:2]
         x, y, bw, bh = box
         crop = crop_region(self.image, box, quad)
@@ -93,8 +139,8 @@ class Extractor:
             self.observations.append({"fieldPath":field,"rawText":None,"value":None,"confidence":0,"sourceMethod":"OCR","bbox":box,"needsReview":True,"confidenceKind":"UNCALIBRATED","geometry":"TEMPLATE"})
             return None
         gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-        gray = cv2.createCLAHE(clipLimit=2, tileGridSize=(4,4)).apply(gray)
-        binary = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY_INV,31,12)
+        gray = cv2.createCLAHE(clipLimit=self.config["claheClipLimit"], tileGridSize=(4,4)).apply(gray)
+        binary = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY_INV,self.config["adaptiveThresholdBlockSize"],self.config["adaptiveThresholdC"])
         # Remove long grid lines, not retain unknown cells as fabricated zero.
         lines = cv2.morphologyEx(binary,cv2.MORPH_OPEN,cv2.getStructuringElement(cv2.MORPH_RECT,(max(20,int(bw*w*.8)),1)))
         binary = cv2.subtract(binary, lines)
@@ -105,7 +151,7 @@ class Extractor:
         confidence_kind = "UNCALIBRATED"
         if kind in ("dt", "count") and self.dt_recognizer is not None:
             model_text, model_conf = self._recognize_model(crop, clean)
-            if model_text and model_conf > 0.3:
+            if model_text and model_conf > self.config["modelConfidenceThreshold"]:
                 raw, confidence = model_text, model_conf
             else:
                 raw, confidence = self._recognize_tesseract(crop, clean, kind, psm, bw, w)
@@ -114,7 +160,7 @@ class Extractor:
 
         if kind in ("number", "count"):
             value = number(raw, field)
-            if kind == "count" and (value is None or value != int(value) or value > 5000): value = None
+            if kind == "count" and (value is None or value != int(value) or value > self.config["maxCount"]): value = None
             elif kind == "count": value = int(value)
         elif kind == "date": value = date_value(raw)
         elif kind == "shift": value = shift_value(raw)
@@ -147,11 +193,11 @@ class Extractor:
             variants += [cv2.copyMakeBorder(plain,12,12,12,12,cv2.BORDER_CONSTANT,value=255),cv2.copyMakeBorder(cv2.threshold(plain,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1],12,12,12,12,cv2.BORDER_CONSTANT,value=255)]
         candidates=[]
         for variant in variants:
-            cv2.imwrite(str(crop_path),cv2.resize(variant,None,fx=3,fy=3))
+            cv2.imwrite(str(crop_path),cv2.resize(variant,None,fx=self.config["tesseractScale"],fy=self.config["tesseractScale"]))
             command=[self.tesseract,str(crop_path),"stdout","--psm",str(psm),"-l","eng"]
             if kind in ("number","count","dt","date"):
                 command += ["-c","tessedit_char_whitelist=0123456789.,/-"]
-            result=subprocess.run(command+["tsv"],capture_output=True,text=True,encoding="utf-8",timeout=15,check=True)
+            result=subprocess.run(command+["tsv"],capture_output=True,text=True,encoding="utf-8",timeout=self.config["tesseractTimeoutSeconds"],check=True)
             words=[r for r in csv.DictReader(io.StringIO(result.stdout),delimiter="\t") if r.get("text", "").strip() and float(r.get("conf", -1))>=0]
             text=" ".join(r["text"] for r in words)
             score=sum(float(r["conf"]) for r in words)/max(1,len(words))/100
@@ -163,7 +209,8 @@ class Extractor:
 
 
 
-def parse(data, shifts):
+def parse(data, shifts, config=None):
+    effective_config = parser_config(config)
     Image.MAX_IMAGE_PIXELS = 24_000_000
     with Image.open(io.BytesIO(data)) as opened:
         if opened.width*opened.height > 24_000_000: raise ValueError("Image too large")
@@ -175,11 +222,11 @@ def parse(data, shifts):
     layout, _ = detect_layout(image, TEMPLATE)
     layout_issues=[]
     with tempfile.TemporaryDirectory(prefix="limestone-roi-") as directory:
-        reader = Extractor(image,directory)
+        reader = Extractor(image,directory,effective_config)
         draft = {"schemaVersion":"1.0","reportDate":None,"shiftCode":None,"timezone":"Asia/Makassar","hours":[],"header":{},"vendors":[],"production":{},"pile":{},"notes":{},"reportRetaseTotal":None}
         for field, box in TEMPLATE["fields"].items():
             kind = "date" if field=="reportDate" else "shift" if field=="shiftCode" else "number" if field.startswith(("production.","pile.")) else "text"
-            value = reader.read(field,box,kind,6 if field=="notes.raw" else 7)
+            value = reader.read(field,box,kind,6 if field=="notes.raw" else None)
             if "." in field:
                 group,key = field.split(".",1);draft[group][key] = value
             else: draft[field] = value
@@ -213,10 +260,14 @@ def parse(data, shifts):
         issues.append({"code":"IMAGE_QUALITY_LOW","path":"","severity":"WARNING","message":"Kualitas foto rendah; gunakan foto lebih terang/tajam bila hasil sulit direview."})
     ok,encoded=cv2.imencode(".jpg",image,[cv2.IMWRITE_JPEG_QUALITY,85])
     if not ok: raise ValueError("Cannot encode aligned image")
-    return {"result":{"draft":draft,"observations":reader.observations,"issues":issues,"parserVersion":VERSION,"templateVersion":TEMPLATE["version"]},"alignedBase64":base64.b64encode(encoded).decode("ascii"),"quality":quality}
+    return {"result":{"draft":draft,"observations":reader.observations,"issues":issues,"parserVersion":VERSION,"templateVersion":TEMPLATE["version"]},"alignedBase64":base64.b64encode(encoded).decode("ascii"),"quality":quality,
+            "diagnostics":{"engine":"LEGACY_OCR","effectiveConfig":effective_config,
+                           "digitModelAvailable":reader.dt_recognizer is not None,
+                           "observationCount":len(reader.observations),
+                           "missingValueCount":sum(o["value"] is None for o in reader.observations)}}
 
 
 if __name__=="__main__":
     request=json.load(sys.stdin)
-    response=parse(base64.b64decode(request["imageBase64"],validate=True),request["shiftHours"])
+    response=parse(base64.b64decode(request["imageBase64"],validate=True),request["shiftHours"],request.get("config"))
     print(json.dumps(response,ensure_ascii=True))

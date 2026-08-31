@@ -30,7 +30,7 @@ fields remain editable; old observations/crop polygons are retained.
    not guarantees that a particular model is enabled for your account.
 2. Run only the API and web. Upload and reparse requests call the configured VLM
    within the Fastify invocation, finalize the database draft, and then return.
-   Vercel uses `apps/api/vercel.json` with a 300-second maximum duration.
+   On Vercel, enable Fluid compute and ensure the API function maximum duration is at least 300 seconds in Project Settings; `apps/api/vercel.json` does not override duration.
 3. A supervisor can use **Pengaturan AI** to switch Gemini, OpenAI, OpenRouter,
    or a custom Ollama/vLLM-compatible server, edit a model ID, supply/mask a key,
    test PONG connectivity and save shared configuration.
@@ -59,6 +59,41 @@ Old prototype localStorage keys
 are not imported automatically.
 
 ## Feature parity and deliberate safety changes
+
+### Parser tuning and extraction evidence
+
+In **Pengaturan AI**, supervisors can set an additional system prompt,
+temperature (0–2), top-p (>0–1), and output-token limit (256–65,536).
+Blank numeric fields restore the existing provider defaults; unsupported
+parameters or token budgets are rejected by the selected model. These settings
+are shared by Limestone and Clay and apply to subsequent extractions. The
+built-in report JSON instructions remain present. Connection/model-list tests
+do not run image extraction or use document tuning.
+
+Open **Input / output VLM & tuning parser** on an import to inspect its immutable
+input snapshot, generated text, parsed JSON, normalized initial draft, and parser
+validation errors. Human corrections remain separate. Failed JSON and truncated
+model responses retain available generated text; raw text is bounded to 250,000
+characters with an explicit truncation flag. No keys, transport envelopes, image
+base64, or provider thinking parts are included. Snapshots can still contain
+private report text: protect downloaded JSON accordingly.
+
+After saving configuration, **Jalankan uji parser** sends the stored source photo
+again only after explicit acknowledgement. This preview may consume provider
+quota, but never changes import status, revision, draft, corrections, confirmation,
+or workbench data. Its output is a browser-session experiment; download it before
+changing configuration or leaving the page. Successful/confirmed reports remain
+protected from destructive reparse. Queued/processing imports cannot be previewed.
+
+The authenticated preview endpoints are POST
+`/crusher-report-imports/:id/preview` and `/clay-report-imports/:id/preview`
+with `{ "acknowledgeExternalVlm": true }`. They return
+`{ ok: true, diagnostics }`; captured extraction failures appear in
+`diagnostics.error`, while authorization/configuration preflight errors use the
+normal error response. Existing detail endpoints expose optional diagnostics;
+lightweight history lists omit them. Stored evidence uses the existing
+`parsed_json` JSONB, so no additional database migration is needed. Old imports
+without evidence remain reviewable and may be previewed.
 
 | Original capability            | Integrated behavior                                                                                                                                                                                |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

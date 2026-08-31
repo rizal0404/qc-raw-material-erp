@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { UpdateStockpileLayerRequestSchema } from '@qc/contracts';
+import { describe, expect, it, vi } from 'vitest';
 import type { AuthPrincipal, CreateStockpileLayerRepositoryInput, MasterRepository, QcRepository, StockpileMapRepository, StockpileMixSummaryRecord, WarehouseLayoutRecord } from '@qc/domain';
 import { createStockpileMapService } from './service';
 
@@ -16,7 +17,7 @@ function fixtures(){
   } as unknown as StockpileMapRepository;
   const master={findPileById:async()=>({id:mix.pileId,code:mix.pileCode,name:mix.pileName,materialKind:'LS',plantId:layout.plantId,plantCode:layout.plantCode,plantName:layout.plantName,className:'Timur',active:true,createdAt:new Date(),updatedAt:new Date()})} as unknown as MasterRepository;
   const qc={getQafRules:async()=>({lsR2O3Max:3,lsPileMin:1100,lsPileMax:5000,lsFillerMin:2000,lsFillerMax:5000,clSmMin:2.3,clSmMax:2.8,clAmMin:1.4,clAmMax:2})} as unknown as QcRepository;
-  return{service:createStockpileMapService(repository,master,qc),created:()=>created,reclaimerInput:()=>reclaimerInput,mapCutoff:()=>mapCutoff};
+  return{repository,service:createStockpileMapService(repository,master,qc),created:()=>created,reclaimerInput:()=>reclaimerInput,mapCutoff:()=>mapCutoff};
 }
 
 describe('stockpile map service',()=>{
@@ -35,5 +36,53 @@ describe('stockpile map service',()=>{
   });
   it('rejects a future history date',async()=>{
     const f=fixtures();await expect(f.service.map(principal,{layoutId:layout.id,lotStatus:'ACTIVE',asOf:'2999-01-01'})).rejects.toMatchObject({code:'STOCKPILE_HISTORY_FUTURE_DATE'});
+  });
+});
+
+function editingFixture() {
+  const f=fixtures();
+  const current={id:'77777777-7777-4777-8777-777777777777',lotId:'66666666-6666-4666-8666-666666666666',layoutId:layout.id,lotNo:'9',lotStatus:'ACTIVE' as const,label:null,startPosition:1,endPosition:4,bottomLevel:0,topLevel:1,startDepth:10,endDepth:70,version:3,createdAt:new Date(),updatedAt:new Date()};
+  f.repository.findLayer=async()=>current;
+  f.repository.findLot=async()=>({id:current.lotId,layoutId:layout.id,logicalPileId:mix.pileId,pileCycle:mix.pileCycle}) as Awaited<ReturnType<StockpileMapRepository['findLot']>>;
+  f.repository.listLayerMixes=async()=>[mix];
+  f.repository.updateLayer=vi.fn(async()=>{});
+  f.repository.appendAudit=vi.fn(async()=>{});
+  return {...f,current};
+}
+
+describe('stockpile geometry updates',()=>{
+  it('parses depth-only edits without silently stripping the new fields',()=>{
+    expect(UpdateStockpileLayerRequestSchema.parse({expectedVersion:3,startDepth:20,endDepth:60})).toEqual({expectedVersion:3,startDepth:20,endDepth:60});
+    expect(UpdateStockpileLayerRequestSchema.safeParse({expectedVersion:3,endDepth:101}).success).toBe(false);
+    expect(UpdateStockpileLayerRequestSchema.safeParse({expectedVersion:3,startDepth:Infinity}).success).toBe(false);
+  });
+  it('persists dimensions, expectedVersion and before/after audit without changing Mixes',async()=>{
+    const f=editingFixture();
+    await f.service.updateLayer(principal,f.current.id,{expectedVersion:3,startPosition:2,endPosition:5,bottomLevel:.25,topLevel:1.25,startDepth:25,endDepth:65});
+    expect(f.repository.updateLayer).toHaveBeenCalledWith(expect.objectContaining({expectedVersion:3,startPosition:2,endPosition:5,bottomLevel:.25,topLevel:1.25,startDepth:25,endDepth:65,mixIds:[mix.mixId]}));
+    expect(f.repository.appendAudit).toHaveBeenCalledWith(expect.objectContaining({beforeJson:expect.objectContaining({version:3,startDepth:10,endDepth:70}),afterJson:expect.objectContaining({version:4,startDepth:25,endDepth:65})}));
+  });
+  it('preserves stored depth for updates from the older x/y form',async()=>{
+    const f=editingFixture();await f.service.updateLayer(principal,f.current.id,{expectedVersion:3,bottomLevel:.2});
+    expect(f.repository.updateLayer).toHaveBeenCalledWith(expect.objectContaining({startDepth:10,endDepth:70}));
+  });
+  it('rejects invalid geometry before write or audit',async()=>{
+    const f=editingFixture();await expect(f.service.updateLayer(principal,f.current.id,{expectedVersion:3,startDepth:90,endDepth:40})).rejects.toMatchObject({statusCode:400,code:'STOCKPILE_GEOMETRY_INVALID'});
+    expect(f.repository.updateLayer).not.toHaveBeenCalled();expect(f.repository.appendAudit).not.toHaveBeenCalled();
+  });
+  it('rejects stale versions before merging partial updates',async()=>{
+    const f=editingFixture();await expect(f.service.updateLayer(principal,f.current.id,{expectedVersion:2,endDepth:40})).rejects.toMatchObject({code:'STOCKPILE_VERSION_CONFLICT'});
+    expect(f.repository.updateLayer).not.toHaveBeenCalled();
+  });
+  it('maps transactional collisions and concurrent changes without a success audit',async()=>{
+    for(const code of ['STOCKPILE_LAYER_COLLISION','STOCKPILE_VERSION_CONFLICT','STOCKPILE_LOT_RECLAIMED']){
+      const f=editingFixture();f.repository.updateLayer=async()=>{throw new Error(code);};
+      await expect(f.service.updateLayer(principal,f.current.id,{expectedVersion:3,endDepth:40})).rejects.toMatchObject({code});
+      expect(f.repository.appendAudit).not.toHaveBeenCalled();
+    }
+  });
+  it('rejects non-QC users',async()=>{
+    const f=editingFixture();await expect(f.service.updateLayer({...principal,role:'VENDOR'},f.current.id,{expectedVersion:3,endDepth:40})).rejects.toMatchObject({statusCode:403});
+    expect(f.repository.updateLayer).not.toHaveBeenCalled();
   });
 });

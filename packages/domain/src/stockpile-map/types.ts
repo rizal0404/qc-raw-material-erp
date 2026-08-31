@@ -15,7 +15,7 @@ export interface StockpileLotRecord {
 }
 export interface StockpileLayerRecord {
   id: string; lotId: string; layoutId: string; lotNo: string; lotStatus: StockpileLotStatus; label: string | null;
-  startPosition: number; endPosition: number; bottomLevel: number; topLevel: number; version: number; createdAt: Date; updatedAt: Date;
+  startPosition: number; endPosition: number; bottomLevel: number; topLevel: number; startDepth?: number; endDepth?: number; version: number; createdAt: Date; updatedAt: Date;
 }
 export interface StockpileMixSummaryRecord {
   layerId?: string;

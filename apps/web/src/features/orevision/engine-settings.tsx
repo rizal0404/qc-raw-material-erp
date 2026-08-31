@@ -8,6 +8,24 @@ import {
 } from "@qc/contracts";
 import { Modal } from "../../components/modal";
 import { apiFetch } from "../../lib/api-client";
+import "./parser-tuning.css";
+
+const numericParameter = (value: string) =>
+  value.trim() === "" ? null : Number(value);
+
+function parameterError(temperature: string, topP: string, maxOutputTokens: string) {
+  const values = [numericParameter(temperature), numericParameter(topP), numericParameter(maxOutputTokens)];
+  if (values.some((value) => value !== null && !Number.isFinite(value)))
+    return "Parameter numerik harus berupa angka yang valid.";
+  const [temperatureValue, topPValue, tokenValue] = values;
+  if (temperatureValue != null && (temperatureValue < 0 || temperatureValue > 2))
+    return "Temperature harus antara 0 dan 2.";
+  if (topPValue != null && (topPValue <= 0 || topPValue > 1))
+    return "Top-p harus lebih dari 0 dan maksimal 1.";
+  if (tokenValue != null && (!Number.isInteger(tokenValue) || tokenValue < 256 || tokenValue > 65536))
+    return "Batas output token harus bilangan bulat antara 256 dan 65536.";
+  return "";
+}
 
 export function EngineSettings({
   canManage,
@@ -36,7 +54,7 @@ export function EngineSettings({
       {open && (
         <Modal
           title="Konfigurasi engine OreVision"
-          subtitle="Konfigurasi engine API. Hanya supervisor dapat mengubah provider dan key."
+          subtitle="Input dan parameter VLM bersama untuk Limestone dan Clay. Hanya supervisor dapat mengubah konfigurasi."
           onClose={() => setOpen(false)}
         >
           {query.isPending ? (
@@ -65,6 +83,10 @@ function SettingsForm({
   const [provider, setProvider] = useState(settings.provider),
     [model, setModel] = useState(settings.model),
     [endpoint, setEndpoint] = useState(settings.customEndpoint);
+  const [systemPrompt, setSystemPrompt] = useState(settings.systemPrompt ?? "");
+  const [temperature, setTemperature] = useState(settings.temperature?.toString() ?? "");
+  const [topP, setTopP] = useState(settings.topP?.toString() ?? "");
+  const [maxOutputTokens, setMaxOutputTokens] = useState(settings.maxOutputTokens?.toString() ?? "");
   const [keys, setKeys] = useState<Partial<Record<OreVisionProvider, string>>>(
     {},
   );
@@ -82,6 +104,10 @@ function SettingsForm({
     provider,
     model,
     customEndpoint: endpoint,
+    systemPrompt,
+    temperature: numericParameter(temperature),
+    topP: numericParameter(topP),
+    maxOutputTokens: numericParameter(maxOutputTokens),
     ...(removeKeys[provider]
       ? { apiKey: "" }
       : keys[provider]?.trim()
@@ -99,8 +125,12 @@ function SettingsForm({
       setKeys((previous) => ({ ...previous, [provider]: undefined }));
       setRemoveKeys((previous) => ({ ...previous, [provider]: false }));
       setModel(result.item.model);
+      setSystemPrompt(result.item.systemPrompt ?? "");
+      setTemperature(result.item.temperature?.toString() ?? "");
+      setTopP(result.item.topP?.toString() ?? "");
+      setMaxOutputTokens(result.item.maxOutputTokens?.toString() ?? "");
       setMessage(
-        "Konfigurasi tersimpan. Job berikutnya memakai konfigurasi ini.",
+        "Konfigurasi tersimpan. Ekstraksi berikutnya atau uji parser memakai konfigurasi ini; hasil dan koreksi lama tidak berubah otomatis.",
       );
     },
   });
@@ -134,6 +164,7 @@ function SettingsForm({
   });
   const preset = OREVISION_PROVIDERS[provider],
     busy = save.isPending || test.isPending || discover.isPending;
+  const tuningError = parameterError(temperature, topP, maxOutputTokens);
   const changed = () => {
     setMessage("");
     save.reset();
@@ -300,6 +331,103 @@ function SettingsForm({
           </div>
         </>
       )}
+      <fieldset className="orevision-tuning-fields" disabled={!canManage || busy}>
+        <legend>Konfigurasi input &amp; output VLM</legend>
+        <label>
+          <span>System prompt tambahan</span>
+          <textarea
+            aria-label="System prompt tambahan"
+            rows={6}
+            maxLength={12000}
+            value={systemPrompt}
+            spellCheck={false}
+            placeholder="Contoh: Pertahankan kode DT sesuai tulisan pada foto. Gunakan null jika angka tidak terbaca."
+            onChange={(event) => {
+              setSystemPrompt(event.target.value);
+              changed();
+            }}
+          />
+          <small>
+            {systemPrompt.length.toLocaleString("id-ID")} / 12.000 karakter.
+            Instruksi tambahan tidak mengganti format JSON bawaan Limestone/Clay.
+            Jangan masukkan API key atau rahasia ke prompt.
+          </small>
+        </label>
+        <div className="orevision-tuning-grid">
+          <label>
+            <span>Temperature</span>
+            <input
+              aria-label="Temperature VLM"
+              type="number"
+              min="0"
+              max="2"
+              step="any"
+              value={temperature}
+              placeholder="Default"
+              onChange={(event) => {
+                setTemperature(event.target.value);
+                changed();
+              }}
+            />
+            <small>0–2 · makin rendah, variasi keluaran makin kecil.</small>
+          </label>
+          <label>
+            <span>Top-p</span>
+            <input
+              aria-label="Top-p VLM"
+              type="number"
+              min="0.000001"
+              max="1"
+              step="any"
+              value={topP}
+              placeholder="Default"
+              onChange={(event) => {
+                setTopP(event.target.value);
+                changed();
+              }}
+            />
+            <small>Lebih dari 0 hingga 1 · batas cakupan sampling.</small>
+          </label>
+          <label>
+            <span>Batas output token</span>
+            <input
+              aria-label="Batas output token VLM"
+              type="number"
+              min="256"
+              max="65536"
+              step="1"
+              value={maxOutputTokens}
+              placeholder="Default"
+              onChange={(event) => {
+                setMaxOutputTokens(event.target.value);
+                changed();
+              }}
+            />
+            <small>256–65.536 · naikkan jika JSON terpotong.</small>
+          </label>
+        </div>
+        <p>
+          Kosongkan angka untuk memakai default engine. Dukungan parameter dan
+          batas token mengikuti model. Ubah satu parameter, simpan, lalu uji
+          parser dan bandingkan output pada panel diagnostik.
+        </p>
+        {canManage && (
+          <button
+            className="btn small"
+            type="button"
+            onClick={() => {
+              setSystemPrompt("");
+              setTemperature("");
+              setTopP("");
+              setMaxOutputTokens("");
+              changed();
+            }}
+          >
+            Reset parameter &amp; prompt
+          </button>
+        )}
+      </fieldset>
+      {tuningError && <p className="alert error" role="alert">{tuningError}</p>}
       <p>
         Key tidak dikirim kembali ke browser dan tidak disimpan di localStorage.
         Foto dikirim ke provider yang dipilih; gunakan custom/local bila dokumen
@@ -333,7 +461,7 @@ function SettingsForm({
           <button
             className="btn"
             disabled={
-              busy || !model.trim() || (provider !== "custom" && !hasKey)
+              busy || !!tuningError || !model.trim() || (provider !== "custom" && !hasKey)
             }
             onClick={() => {
               changed();
@@ -344,7 +472,7 @@ function SettingsForm({
           </button>
           <button
             className="btn primary"
-            disabled={busy || !model.trim()}
+            disabled={busy || !!tuningError || !model.trim()}
             onClick={() => {
               changed();
               save.mutate();

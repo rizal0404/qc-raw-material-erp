@@ -203,6 +203,7 @@ describe("inline photo extraction", () => {
       id,
       "lease",
       "OreVision gagal di API. Periksa konfigurasi engine lalu ulangi ekstraksi.",
+      undefined,
     );
     expect(result.status).toBe("FAILED");
     expect(result.error).not.toContain("private upstream body");

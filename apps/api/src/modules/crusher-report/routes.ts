@@ -10,6 +10,8 @@ import {
 import { AppError } from "../../lib/errors";
 import { MAX_REPORT_IMAGE_BYTES, type CrusherReportService } from "./service";
 
+const ExternalVlmConsentSchema = z.object({ acknowledgeExternalVlm: z.literal(true) });
+
 export async function registerCrusherReportRoutes(
   app: FastifyInstance,
   service: CrusherReportService,
@@ -122,11 +124,28 @@ export async function registerCrusherReportRoutes(
             "Get import, draft, field observations and validation issues",
           ),
         },
-        async (request) => ({
+        async (request, reply) => reply.header("Cache-Control", "private, no-store").send({
           ok: true,
           item: await service.get(request.principal!, id(request.params)),
         }),
       );
+    routes.post(
+      "/crusher-report-imports/:id/preview",
+      {
+        ...auth,
+        schema: {
+          ...meta("Preview the current VLM configuration without changing the import or reviewed draft"),
+          body: z.toJSONSchema(ExternalVlmConsentSchema, { target: "draft-7" }),
+        },
+      },
+      async (request, reply) => {
+        ExternalVlmConsentSchema.parse(request.body);
+        return reply.header("Cache-Control", "private, no-store").send({
+          ok: true,
+          diagnostics: await service.preview(request.principal!, id(request.params)),
+        });
+      },
+    );
     routes.get(
       "/crusher-report-imports/:id/image",
       {

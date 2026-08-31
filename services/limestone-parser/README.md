@@ -196,6 +196,52 @@ fallback when no model is present. These do not replace a representative
 real-image test set.
 # Legacy OCR tooling — production replaced by OreVision
 
-`pnpm parser:worker` now uses `apps/api/src/modules/orevision/` and does not
-launch this Python parser. These files/models remain for historical diagnostics
+Production extraction runs inline through `apps/api/src/modules/orevision/`;
+there is no `pnpm parser:worker` command and the API does not launch this Python
+parser. These files/models remain for historical diagnostics
 and benchmarks. See [OreVision setup and feature mapping](../../docs/architecture/orevision-document-extractor.md).
+
+## Runtime tuning for offline OCR
+
+The production OreVision settings now expose an additional system prompt,
+temperature, top-p, and maximum output tokens for VLM extraction. Those are
+VLM-only settings: this Python module does not call a language model and rejects
+unknown parameters rather than silently ignoring them.
+
+For offline OCR experiments, `parse(image_bytes, shift_hours, config=None)` and
+the stdin JSON protocol accept the following optional `config` object. Omitted
+values preserve the legacy defaults. No environment credentials or binary paths
+are accepted in the tuning object.
+
+```json
+{
+  "modelConfidenceThreshold": 0.3,
+  "tesseractPsm": 7,
+  "tesseractScale": 3,
+  "tesseractTimeoutSeconds": 15,
+  "claheClipLimit": 2,
+  "adaptiveThresholdBlockSize": 31,
+  "adaptiveThresholdC": 12,
+  "maxCount": 5000
+}
+```
+
+`modelConfidenceThreshold` is 0–1; `tesseractPsm` is an integer from 3–13;
+`tesseractScale` is 1–5; timeout is 1–60 seconds; CLAHE clip limit is 0.1–10;
+adaptive block size is an odd integer from 3–99; adaptive C is -30–30;
+`maxCount` is an integer from 1–5000. Notes retain their multi-line PSM 6.
+Changing these heuristics does not calibrate confidence or waive human review.
+
+Save the object as a private JSON file and run, for example:
+
+```powershell
+python services/limestone-parser/benchmark.py 'C:\path\report.jpeg' --config .tmp/ocr-config.json --labels .tmp/labels.json --report .tmp/tuned-metrics.json
+```
+
+`--config` also applies in oracle mode; it cannot be combined with a cached
+`--result`, since that would not rerun OCR. Each benchmark sample records its
+effective configuration. Parser JSON includes `diagnostics.engine` (`LEGACY_OCR`),
+`effectiveConfig`, digit-model availability, and observation/missing-value counts.
+Raw recognized text and parsed values remain paired in `result.observations`;
+the normalized report remains in `result.draft`. Existing raw/parsed outputs
+are never replaced with example values.

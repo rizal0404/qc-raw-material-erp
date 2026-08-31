@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type { CrusherReportRepository } from "@qc/domain";
+import { OreVisionDiagnosticsSchema } from "@qc/contracts";
 import type {
   CrusherReportDraft,
   CrusherReportImport,
@@ -55,6 +56,11 @@ export function createCrusherReportRepository(
         ],
       ),
     );
+    // Legacy OCR imports have no diagnostic snapshot. Validate only this
+    // optional metadata so old or malformed snapshots never hide the draft.
+    const diagnostics = OreVisionDiagnosticsSchema.safeParse(
+      r.parsed_json?.diagnostics,
+    );
     return {
       id: r.id,
       crusherId: r.crusher_id,
@@ -74,6 +80,7 @@ export function createCrusherReportRepository(
       error: r.error,
       hasAlignedImage: r.has_aligned,
       reportId: r.report_id ?? null,
+      diagnostics: diagnostics.success ? diagnostics.data : null,
     };
   }
   return {
@@ -87,7 +94,7 @@ export function createCrusherReportRepository(
     get,
     async list(crusherId) {
       const items = await rows(
-        sql`SELECT i.*,r.id AS report_id FROM crusher_report_imports i LEFT JOIN crusher_reports r ON r.import_id=i.id WHERE i.crusher_id=${crusherId}::uuid ORDER BY i.created_at DESC LIMIT 30`,
+        sql`SELECT i.id,i.crusher_id,i.file_name,i.sha256,i.status,i.revision,i.created_at,i.confirmed_at,i.parser_version,i.template_version,i.error,r.id AS report_id FROM crusher_report_imports i LEFT JOIN crusher_reports r ON r.import_id=i.id WHERE i.crusher_id=${crusherId}::uuid ORDER BY i.created_at DESC LIMIT 30`,
       );
       return items.map((r) => ({
         id: r.id,
@@ -241,7 +248,7 @@ export function createCrusherReportRepository(
         sql`UPDATE crusher_report_imports SET status='QUEUED',error='Proses ekstraksi sebelumnya terputus; permintaan ini mengambil alih dengan aman.',lease_token=NULL WHERE id=${id}::uuid AND status='PROCESSING' AND started_at<now()-interval '5 minutes'`,
       );
       const [r] = await rows(
-        sql`UPDATE crusher_report_imports SET status='PROCESSING',started_at=now(),lease_token=gen_random_uuid(),error=NULL WHERE id=${id}::uuid AND status='QUEUED' RETURNING id,lease_token`,
+        sql`UPDATE crusher_report_imports SET status='PROCESSING',started_at=now(),lease_token=gen_random_uuid(),error=NULL,parsed_json=NULL WHERE id=${id}::uuid AND status='QUEUED' RETURNING id,lease_token`,
       );
       if (!r) return null;
       const source = await this.file(r.id, false);
@@ -263,14 +270,17 @@ export function createCrusherReportRepository(
         );
       });
     },
-    async fail(id, token, message) {
+    async fail(id, token, message, diagnostics) {
+      const parsed = diagnostics
+        ? json({ diagnostics: OreVisionDiagnosticsSchema.parse(diagnostics) })
+        : sql`NULL`;
       await rows(
-        sql`UPDATE crusher_report_imports SET status='FAILED',error=${message},lease_token=NULL,completed_at=now(),revision=revision+1 WHERE id=${id}::uuid AND lease_token=${token}::uuid AND status='PROCESSING'`,
+        sql`UPDATE crusher_report_imports SET status='FAILED',error=${message},parsed_json=${parsed},lease_token=NULL,completed_at=now(),revision=revision+1 WHERE id=${id}::uuid AND lease_token=${token}::uuid AND status='PROCESSING'`,
       );
     },
     async requeue(id) {
       await rows(
-        sql`UPDATE crusher_report_imports SET status='QUEUED',error=NULL,lease_token=NULL,revision=revision+1 WHERE id=${id}::uuid AND status='FAILED'`,
+        sql`UPDATE crusher_report_imports SET status='QUEUED',error=NULL,parsed_json=NULL,lease_token=NULL,revision=revision+1 WHERE id=${id}::uuid AND status='FAILED'`,
       );
     },
   };

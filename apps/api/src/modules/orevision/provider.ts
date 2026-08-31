@@ -215,6 +215,18 @@ const responseSchema = z.object({
     )
     .optional(),
 });
+
+export function visionOutputTokenLimit(settings: EngineSettings): number {
+  return (
+    settings.maxOutputTokens ??
+    (settings.provider === "gemini"
+      ? 24000
+      : settings.provider === "openai"
+        ? 16000
+        : 8192)
+  );
+}
+
 export async function callVision(
   settings: EngineSettings,
   prompt: string,
@@ -237,8 +249,16 @@ export async function callVision(
       : `Bearer ${key}`;
   if (settings.provider === "openrouter")
     headers["X-Title"] = "QC Raw Material - OreVision";
+  // Tuning is for document extraction only. Connection checks must remain
+  // inexpensive and must not be affected by document-specific instructions.
+  const systemPrompt = image ? settings.systemPrompt?.trim() : "";
+  const temperature = image ? settings.temperature : null;
+  const topP = image ? settings.topP : null;
   const body = gemini
     ? {
+        ...(systemPrompt
+          ? { systemInstruction: { parts: [{ text: systemPrompt }] } }
+          : {}),
         contents: [
           {
             parts: [
@@ -258,16 +278,19 @@ export async function callVision(
         ],
         generationConfig: {
           ...(image ? { responseMimeType: "application/json" } : {}),
+          ...(temperature != null ? { temperature } : {}),
+          ...(topP != null ? { topP } : {}),
           ...(!image
             ? { thinkingConfig: geminiConnectionTestThinking(settings.model) }
             : {}),
           // Thinking models share the output budget with internal reasoning.
-          maxOutputTokens: image ? 24000 : 4096,
+          maxOutputTokens: image ? visionOutputTokenLimit(settings) : 4096,
         },
       }
     : {
         model: settings.model,
         messages: [
+          ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
           {
             role: "user",
             content: image
@@ -285,11 +308,9 @@ export async function callVision(
           },
         ],
         ...(image ? { response_format: { type: "json_object" } } : {}),
-        max_tokens: image
-          ? settings.provider === "openai"
-            ? 16000
-            : 8192
-          : 128,
+        ...(temperature != null ? { temperature } : {}),
+        ...(topP != null ? { top_p: topP } : {}),
+        max_tokens: image ? visionOutputTokenLimit(settings) : 128,
       };
   try {
     const res = await requestProvider(
@@ -311,6 +332,23 @@ export async function callVision(
     const result = responseSchema.parse(await readJson(res));
     const candidate = result.candidates?.[0],
       choice = result.choices?.[0];
+    const content = gemini
+      ? candidate?.content?.parts
+          .filter((p) => !p.thought)
+          .map((p) => p.text ?? "")
+          .join("")
+      : choice?.message.content;
+    // Preserve only bounded model text for failed-run diagnostics. Never retain
+    // the HTTP envelope, authentication headers, or Gemini reasoning parts.
+    const rawOutput = content ?? "";
+    const details = image
+      ? {
+          rawOutput: rawOutput.slice(0, 250_000),
+          rawOutputTruncated: rawOutput.length > 250_000,
+          finishReason:
+            (gemini ? candidate?.finishReason : choice?.finish_reason) ?? null,
+        }
+      : undefined;
     if (
       candidate?.finishReason === "MAX_TOKENS" ||
       choice?.finish_reason === "length"
@@ -319,20 +357,26 @@ export async function callVision(
         502,
         "OREVISION_RESPONSE_TRUNCATED",
         "Respons model terpotong karena batas token. Pilih model dengan kapasitas output lebih besar atau coba kembali; hasil parsial tidak digunakan.",
+        details,
       );
     if (
       gemini
         ? candidate?.finishReason !== "STOP"
         : choice?.finish_reason !== "stop" || !!choice?.message.refusal
     )
-      throw new Error("Incomplete or refused response");
-    const content = gemini
-      ? candidate?.content?.parts
-          .filter((p) => !p.thought)
-          .map((p) => p.text ?? "")
-          .join("")
-      : choice?.message.content;
-    if (!content?.trim()) throw new Error("Empty content");
+      throw new AppError(
+        502,
+        "OREVISION_RESPONSE_INVALID",
+        "Respons OreVision terputus atau ditolak. Tidak ada data contoh yang digunakan.",
+        details,
+      );
+    if (!content?.trim())
+      throw new AppError(
+        502,
+        "OREVISION_RESPONSE_INVALID",
+        "Respons OreVision tidak berisi hasil ekstraksi. Tidak ada data contoh yang digunakan.",
+        details,
+      );
     return content.trim();
   } catch (error) {
     if (error instanceof AppError) throw error;

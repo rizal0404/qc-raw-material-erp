@@ -22,6 +22,7 @@ import {
 import "./orevision.css";
 import "./side-by-side-review.css";
 import { EngineSettings } from "./engine-settings";
+import { ParserDiagnostics } from "./parser-diagnostics";
 import { AppIcon } from "../../components/app-icon";
 import {
   DemoDocument,
@@ -1029,6 +1030,17 @@ export function OreVisionExtractor({
               </small>
             )}
           </div>
+          <ParserDiagnostics
+            key={item.id}
+            diagnostics={item.diagnostics}
+            material="LS"
+            importId={item.id}
+            status={item.status}
+            canManage={user?.role === "SUPERVISOR_ADMIN"}
+            disabled={busy}
+            active={active}
+            demo={demo}
+          />
           {demo && (
             <div className="alert inline-alert" role="status">
               Mode demo · data contoh tidak dapat dikonfirmasi ke rekonsiliasi.

@@ -4,20 +4,14 @@ import {
   oreVisionToDraft,
   type CrusherReportObservation,
 } from "@qc/contracts";
-import { AppError } from "../../lib/errors";
 import { createOreVisionSettings } from "./settings";
 import { callVision } from "./provider";
 import { extractionPrompt } from "./prompt";
+import { createVisionDiagnostics, extractionFailure, parseVisionOutput } from "./diagnostics";
 
-export async function extractReport(
-  bytes: Buffer,
-  shiftHours: Record<string, number[]>,
-) {
-  const store = createOreVisionSettings(),
-    settings = await store.read();
-  store.checkEndpoint(settings);
-  // Decode all supported source formats, apply EXIF orientation and preserve aspect
-  // ratio. This is normalization, NOT fabricated grid registration/bounding boxes.
+export async function normalizeReportImage(bytes: Buffer) {
+  // Shared normalization for all crusher report templates. It corrects EXIF
+  // orientation and bounds provider payload size without inventing geometry.
   let aligned = await sharp(bytes, {
     limitInputPixels: 24_000_000,
     failOn: "warning",
@@ -32,35 +26,40 @@ export async function extractReport(
     .flatten({ background: "white" })
     .jpeg({ quality: 90, chromaSubsampling: "4:2:0" })
     .toBuffer();
-  // Both source and aligned previews must stay below the Vercel Function
-  // response limit. Provider requests still receive the highest safe version.
   if (aligned.length > 4 * 1024 * 1024)
     aligned = await sharp(aligned)
       .resize({ width: 2200, height: 3000, fit: "inside" })
       .jpeg({ quality: 80, chromaSubsampling: "4:2:0" })
       .toBuffer();
-  const content = await callVision(
-    settings,
-    extractionPrompt(shiftHours),
-    aligned,
-  );
+  return aligned;
+}
+
+export async function extractReport(
+  bytes: Buffer,
+  shiftHours: Record<string, number[]>,
+) {
+  const store = createOreVisionSettings(),
+    settings = await store.read();
+  store.checkEndpoint(settings);
+  const aligned = await normalizeReportImage(bytes);
+  const prompt = extractionPrompt(shiftHours);
+  const diagnostics = await createVisionDiagnostics(settings, prompt, aligned, shiftHours);
   let draft;
   try {
+    const content = await callVision(settings, prompt, aligned);
     draft = oreVisionToDraft(
-      JSON.parse(
-        content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, ""),
-      ),
+      parseVisionOutput(content, diagnostics),
       settings.provider,
       settings.model,
       shiftHours,
     );
-  } catch {
-    throw new AppError(
-      502,
-      "OREVISION_REPORT_INVALID",
-      "Hasil AI tidak sesuai struktur laporan. Periksa foto/model lalu ulangi parser.",
-    );
+  } catch (error) {
+    throw extractionFailure(diagnostics, error, {
+      code: "OREVISION_REPORT_INVALID",
+      message: "Hasil AI tidak sesuai struktur laporan. Periksa foto/model lalu ulangi parser.",
+    });
   }
+  diagnostics.normalizedDraft = structuredClone(draft);
   const observations: CrusherReportObservation[] = [];
   for (const [vi, vendor] of draft.vendors.entries())
     for (const [ri, row] of vendor.vehicles.entries()) {
@@ -94,6 +93,7 @@ export async function extractReport(
       ],
       parserVersion: "orevision-1.0.0",
       templateVersion: "vision-report-1.0",
+      diagnostics,
     }),
   };
 }

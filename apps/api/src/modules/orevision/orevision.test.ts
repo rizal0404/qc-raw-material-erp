@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import sharp from "sharp";
@@ -7,10 +7,11 @@ import Fastify from "fastify";
 import {
   CrusherReportDraftSchema,
   CrusherReportWorkerResultSchema,
+  OreVisionSettingsSchema,
   draftToOreVision,
   oreVisionToDraft,
 } from "@qc/contracts";
-import { callVision } from "./provider";
+import { callVision, visionOutputTokenLimit } from "./provider";
 import { createOreVisionSettings, type EngineSettings } from "./settings";
 import { extractReport } from "./extractor";
 import { registerOreVisionRoutes } from "./routes";
@@ -67,6 +68,10 @@ const settings: EngineSettings = {
   provider: "openai",
   model: "gpt-4o",
   customEndpoint: "http://localhost:11434/v1/chat/completions",
+  systemPrompt: "",
+  temperature: null,
+  topP: null,
+  maxOutputTokens: null,
   keys: { openai: "secret-test" },
 };
 const completion = (content: string, finish = "stop") =>
@@ -125,6 +130,189 @@ describe("OreVision canonical adapter", () => {
 
 describe("OreVision providers", () => {
   it.each(["openai", "openrouter", "custom"] as const)(
+    "forwards image tuning and a distinct system instruction to %s",
+    async (provider) => {
+      const fetcher = vi.fn<typeof fetch>().mockResolvedValue(completion("{}"));
+      await callVision(
+        {
+          ...settings,
+          provider,
+          keys: { [provider]: "secret-test" },
+          systemPrompt: "  Preserve unreadable values as null.  ",
+          temperature: 0,
+          topP: 0.8,
+          maxOutputTokens: 12000,
+        },
+        "Built-in extraction JSON schema",
+        Buffer.from("image"),
+        fetcher,
+      );
+      const body = JSON.parse(String(fetcher.mock.calls[0]![1]?.body));
+      expect(body.messages[0]).toEqual({
+        role: "system",
+        content: "Preserve unreadable values as null.",
+      });
+      expect(body.messages[1].role).toBe("user");
+      expect(body.messages[1].content[0].text).toBe(
+        "Built-in extraction JSON schema",
+      );
+      expect(body).toMatchObject({
+        temperature: 0,
+        top_p: 0.8,
+        max_tokens: 12000,
+      });
+      expect(body.response_format).toEqual({ type: "json_object" });
+    },
+  );
+  it.each(["openai", "openrouter", "custom", "gemini"] as const)(
+    "does not apply document tuning to a %s connection check",
+    async (provider) => {
+      const response =
+        provider === "gemini"
+          ? new Response(
+              JSON.stringify({
+                candidates: [
+                  {
+                    finishReason: "STOP",
+                    content: { parts: [{ text: "PONG" }] },
+                  },
+                ],
+              }),
+            )
+          : completion("PONG");
+      const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response);
+      await callVision(
+        {
+          ...settings,
+          provider,
+          model: provider === "gemini" ? "gemini-2.5-flash" : settings.model,
+          keys: { [provider]: "secret-test" },
+          systemPrompt: "Extract the report; never answer PONG.",
+          temperature: 1.5,
+          topP: 0.2,
+          maxOutputTokens: 32000,
+        },
+        "ping",
+        undefined,
+        fetcher,
+      );
+      const body = JSON.parse(String(fetcher.mock.calls[0]![1]?.body));
+      expect(JSON.stringify(body)).not.toContain("never answer");
+      if (provider === "gemini") {
+        expect(body).not.toHaveProperty("systemInstruction");
+        expect(body.generationConfig.maxOutputTokens).toBe(4096);
+        expect(body.generationConfig).not.toHaveProperty("temperature");
+        expect(body.generationConfig).not.toHaveProperty("topP");
+      } else {
+        expect(body.messages).toEqual([{ role: "user", content: "ping" }]);
+        expect(body.max_tokens).toBe(128);
+        expect(body).not.toHaveProperty("temperature");
+        expect(body).not.toHaveProperty("top_p");
+      }
+    },
+  );
+  it("uses native Gemini systemInstruction and generation config for image tuning", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          candidates: [
+            { finishReason: "STOP", content: { parts: [{ text: "{}" }] } },
+          ],
+        }),
+      ),
+    );
+    await callVision(
+      {
+        ...settings,
+        provider: "gemini",
+        model: "gemini-2.5-flash",
+        keys: { gemini: "test" },
+        systemPrompt: "Keep zero distinct from blank.",
+        temperature: 0.1,
+        topP: 0.9,
+        maxOutputTokens: 32000,
+      },
+      "Extract JSON",
+      Buffer.from("image"),
+      fetcher,
+    );
+    const body = JSON.parse(String(fetcher.mock.calls[0]![1]?.body));
+    expect(body.systemInstruction).toEqual({
+      parts: [{ text: "Keep zero distinct from blank." }],
+    });
+    expect(body.contents[0].parts[0]).toEqual({ text: "Extract JSON" });
+    expect(body.generationConfig).toMatchObject({
+      responseMimeType: "application/json",
+      temperature: 0.1,
+      topP: 0.9,
+      maxOutputTokens: 32000,
+    });
+  });
+  it("keeps legacy output budgets when tuning is reset", () => {
+    expect(visionOutputTokenLimit(settings)).toBe(16000);
+    expect(visionOutputTokenLimit({ ...settings, provider: "gemini" })).toBe(
+      24000,
+    );
+    expect(visionOutputTokenLimit({ ...settings, provider: "custom" })).toBe(
+      8192,
+    );
+    expect(visionOutputTokenLimit({ ...settings, maxOutputTokens: 4096 })).toBe(
+      4096,
+    );
+  });
+  it("retains bounded generated text on truncation without retaining the response envelope", async () => {
+    const output = "x".repeat(250001);
+    const error = await callVision(
+      settings,
+      "extract",
+      Buffer.from("image"),
+      vi.fn().mockResolvedValue(completion(output, "length")),
+    ).catch((e: unknown) => e);
+    expect(error).toMatchObject({
+      code: "OREVISION_RESPONSE_TRUNCATED",
+      details: {
+        rawOutput: "x".repeat(250000),
+        rawOutputTruncated: true,
+        finishReason: "length",
+      },
+    });
+    expect(JSON.stringify(error)).not.toContain("secret-test");
+    expect(JSON.stringify(error)).not.toContain("choices");
+  });
+  it("never includes Gemini thought parts in failed-run output", async () => {
+    const error = await callVision(
+      {
+        ...settings,
+        provider: "gemini",
+        model: "gemini-2.5-flash",
+        keys: { gemini: "test" },
+      },
+      "extract",
+      Buffer.from("image"),
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                finishReason: "MAX_TOKENS",
+                content: {
+                  parts: [
+                    { thought: true, text: "private reasoning" },
+                    { text: "partial JSON" },
+                  ],
+                },
+              },
+            ],
+          }),
+        ),
+      ),
+    ).catch((e: unknown) => e);
+    expect(error).toMatchObject({
+      details: { rawOutput: "partial JSON", rawOutputTruncated: false },
+    });
+    expect(JSON.stringify(error)).not.toContain("private reasoning");
+  });
+  it.each(["openai", "openrouter", "custom"] as const)(
     "sends JPEG vision payload to %s",
     async (provider) => {
       const fetcher = vi
@@ -143,6 +331,10 @@ describe("OreVision providers", () => {
         JSON.parse(String(request?.body)).messages[0].content[1].image_url.url,
       ).toBe("data:image/jpeg;base64,aW1hZ2U=");
       expect(JSON.parse(String(request?.body)).model).toBe("gpt-4o");
+      expect(JSON.parse(String(request?.body))).not.toHaveProperty(
+        "temperature",
+      );
+      expect(JSON.parse(String(request?.body))).not.toHaveProperty("top_p");
     },
   );
   it("uses Gemini inlineData and header auth rather than putting the key in a URL", async () => {
@@ -198,6 +390,84 @@ describe("OreVision providers", () => {
 });
 
 describe("OreVision configuration and inline extractor", () => {
+  it("defaults legacy settings and preserves omitted tuning until it is explicitly reset", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orevision-tuning-test-"));
+    try {
+      const path = join(dir, "settings.json");
+      await writeFile(
+        path,
+        JSON.stringify({
+          provider: "openai",
+          model: "gpt-4o",
+          customEndpoint: settings.customEndpoint,
+          keys: { openai: "private-old-key" },
+        }),
+      );
+      const store = createOreVisionSettings({ OREVISION_SETTINGS_FILE: path });
+      expect(store.view(await store.read())).toMatchObject({
+        systemPrompt: "",
+        temperature: null,
+        topP: null,
+        maxOutputTokens: null,
+      });
+      const input = {
+        provider: "openai" as const,
+        model: "gpt-4o",
+        customEndpoint: settings.customEndpoint,
+      };
+      const tuned = await store.save({
+        ...input,
+        systemPrompt: "Preserve nulls",
+        temperature: 0,
+        topP: 0.9,
+        maxOutputTokens: 12000,
+      });
+      expect(tuned).toMatchObject({
+        systemPrompt: "Preserve nulls",
+        temperature: 0,
+        topP: 0.9,
+        maxOutputTokens: 12000,
+      });
+      expect(JSON.stringify(tuned)).not.toContain("private-old-key");
+      expect(await store.save(input)).toMatchObject({
+        systemPrompt: "Preserve nulls",
+        temperature: 0,
+        topP: 0.9,
+        maxOutputTokens: 12000,
+      });
+      expect(
+        await store.save({
+          ...input,
+          systemPrompt: "",
+          temperature: null,
+          topP: null,
+          maxOutputTokens: null,
+        }),
+      ).toMatchObject({
+        systemPrompt: "",
+        temperature: null,
+        topP: null,
+        maxOutputTokens: null,
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+  it.each([
+    { systemPrompt: "x".repeat(12001) },
+    { temperature: -1 },
+    { temperature: 2.1 },
+    { temperature: Number.NaN },
+    { topP: 0 },
+    { topP: 1.1 },
+    { maxOutputTokens: 0 },
+    { maxOutputTokens: 65537 },
+    { maxOutputTokens: 300.5 },
+  ])("rejects invalid tuning %#", (tuning) => {
+    expect(
+      OreVisionSettingsSchema.safeParse({ ...settings, ...tuning }).success,
+    ).toBe(false);
+  });
   it("persists per-provider keys, redacts reads and permits only server-allowlisted custom endpoints", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orevision-test-"));
     try {

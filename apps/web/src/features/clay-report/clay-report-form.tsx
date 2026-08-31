@@ -24,7 +24,7 @@ export function ContextFields({ context, lookup, onChange, disabled = false, ope
   </div>;
 }
 
-export function ClayReportForm({ report, lookup, role, onReport, onContextChange }: { report: ClayReport; lookup: MasterLookupResponse; role: Role; onReport: (report: ClayReport) => void; onContextChange: (context: ClayReportContext) => void }) {
+export function ClayReportForm({ report, lookup, role, onReport, onContextChange, modeNavigation }: { report: ClayReport; lookup: MasterLookupResponse; role: Role; onReport: (report: ClayReport) => void; onContextChange: (context: ClayReportContext) => void; modeNavigation?: ReactNode }) {
   const qc = role === 'QC_ANALYST' || role === 'SUPERVISOR_ADMIN', operator = role === 'CRUSHER_OPERATOR';
   const editable = report.status === 'DRAFT';
   const draft = useClayDraft(report, qc, onReport);
@@ -89,6 +89,7 @@ export function ClayReportForm({ report, lookup, role, onReport, onContextChange
 
   return <div className="clay-page" id="clay-form-start">
     <ClayHeading unit={report.crusherName} date={report.operationDate} shift={report.shiftCode} status={report.status}><span className="clay-autosave">{draft.busy || (draft.dirty ? 'Ada perubahan belum tersimpan' : `Tersimpan · ${formatTime(draft.savedAt)} WITA`)}</span></ClayHeading>
+    {modeNavigation}
     <div className="clay-tabs" role="tablist" aria-label="Bagian laporan Clay">{tabs.map((title, index) => <button key={title} id={`clay-tab-${index}`} type="button" role="tab" aria-selected={tab === index} aria-controls={`clay-panel-${index}`} tabIndex={tab === index ? 0 : -1} onClick={() => setTab(index)} onKeyDown={e => {
       if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
       e.preventDefault(); const next = e.key === 'Home' ? 0 : e.key === 'End' ? 2 : (tab + (e.key === 'ArrowRight' ? 1 : 2)) % 3; setTab(next); document.getElementById(`clay-tab-${next}`)?.focus();

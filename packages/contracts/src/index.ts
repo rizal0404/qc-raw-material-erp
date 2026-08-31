@@ -6,6 +6,7 @@ export * from './roles';
 
 export * from './master';
 export * from './clay-report';
+export * from './clay-photo-report';
 export * from './qc';
 
 export * from './vendor-operation';
